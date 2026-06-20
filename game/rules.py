@@ -22,9 +22,19 @@ def valida_seme(seme: str) -> None:
         raise ValueError(f"Seme sconosciuto: {seme}")
 
 
+def valida_squadra(squadra: str) -> None:
+    if squadra not in (SQUADRA_PARI, SQUADRA_DISPARI):
+        raise ValueError(f"Squadra sconosciuta: {squadra}")
+
+
 def squadra_di(giocatore_id: int) -> str:
     valida_giocatore_id(giocatore_id)
     return SQUADRA_PARI if giocatore_id % 2 == 0 else SQUADRA_DISPARI
+
+
+def squadra_avversaria_di(squadra: str) -> str:
+    valida_squadra(squadra)
+    return SQUADRA_DISPARI if squadra == SQUADRA_PARI else SQUADRA_PARI
 
 
 def compagno_di(giocatore_id: int) -> int:
