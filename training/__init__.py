@@ -7,6 +7,7 @@ from .episode import (
     TrajectoryStep,
     collect_episode,
 )
+from .pool import Snapshot, SnapshotPool
 from .reinforce import (
     BASELINE_MODES,
     ReinforceConfig,
@@ -33,6 +34,8 @@ __all__ = [
     "EpisodeResult",
     "ReinforceConfig",
     "RewardConfig",
+    "Snapshot",
+    "SnapshotPool",
     "TrajectoryStep",
     "TrainStats",
     "calcola_margine",
