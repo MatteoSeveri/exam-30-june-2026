@@ -47,6 +47,7 @@ class TestPlayMatch(unittest.TestCase):
             seed_ambiente=10,
             seed_policy=20,
             primo_giocatore_id=0,
+            greedy=True,
         )
 
         self.assertEqual(sum(result.punteggi_finali.values()), 120)
@@ -72,12 +73,14 @@ class TestPlayMatch(unittest.TestCase):
             seed_ambiente=11,
             seed_policy=21,
             primo_giocatore_id=1,
+            greedy=True,
         )
         second = play_match(
             policies_by_player=random_policies(),
             seed_ambiente=11,
             seed_policy=21,
             primo_giocatore_id=1,
+            greedy=True,
         )
 
         self.assertEqual(first, second)
@@ -94,6 +97,7 @@ class TestPlayMatch(unittest.TestCase):
             seed_ambiente=12,
             seed_policy=22,
             primo_giocatore_id=2,
+            greedy=True,
         )
 
         for giocatore_id, policy in policies.items():
@@ -109,6 +113,7 @@ class TestPlayMatch(unittest.TestCase):
                 seed_ambiente=13,
                 seed_policy=23,
                 primo_giocatore_id=0,
+                greedy=True,
             )
 
         with self.assertRaises(ValueError):
@@ -123,6 +128,7 @@ class TestPlayMatch(unittest.TestCase):
                 seed_ambiente=13,
                 seed_policy=23,
                 primo_giocatore_id=0,
+                greedy=True,
             )
 
     def test_primo_giocatore_non_valido_solleva_value_error(self):
@@ -133,7 +139,26 @@ class TestPlayMatch(unittest.TestCase):
                 seed_ambiente=14,
                 seed_policy=24,
                 primo_giocatore_id=4,
+                greedy=True,
             )
+
+    def test_play_match_passa_anche_greedy_false_quando_richiesto(self):
+        # match.py esegue il protocollo ricevuto, senza imporre greedy da solo.
+        policies = {
+            giocatore_id: TrackingPolicy(name=f"policy_{giocatore_id}")
+            for giocatore_id in range(4)
+        }
+
+        play_match(
+            policies_by_player=policies,
+            seed_ambiente=15,
+            seed_policy=25,
+            primo_giocatore_id=0,
+            greedy=False,
+        )
+
+        for policy in policies.values():
+            self.assertEqual(set(policy.greedy_values), {False})
 
 
 if __name__ == "__main__":

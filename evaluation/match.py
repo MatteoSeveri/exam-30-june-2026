@@ -33,8 +33,9 @@ def play_match(
     seed_ambiente: int,
     seed_policy: int,
     primo_giocatore_id: int,
+    greedy: bool,
 ) -> MatchResult:
-    """Play one frozen match with greedy policy evaluation."""
+    """Play one frozen match with the requested action-selection mode."""
 
     _valida_policies_by_player(policies_by_player)
     valida_giocatore_id(primo_giocatore_id)
@@ -49,7 +50,7 @@ def play_match(
         giocatore_id = ambiente.giocatore_corrente
         osservazione = ambiente.osserva(giocatore_id)
         policy = policies_by_player[giocatore_id]
-        azione = policy.select_action(osservazione, rng_policy, greedy=True)
+        azione = policy.select_action(osservazione, rng_policy, greedy=greedy)
         ambiente.gioca(azione)
 
     ambiente.verifica_integrita_stato()
