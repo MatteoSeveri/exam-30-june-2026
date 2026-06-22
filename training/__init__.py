@@ -24,6 +24,7 @@ from .rewards import (
     reward_finale,
     reward_presa,
 )
+from .self_play import SelfPlayConfig, SelfPlayStats, SelfPlayTrainer
 
 __all__ = [
     "MOSSE_PER_GIOCATORE",
@@ -36,6 +37,9 @@ __all__ = [
     "RewardConfig",
     "Snapshot",
     "SnapshotPool",
+    "SelfPlayConfig",
+    "SelfPlayStats",
+    "SelfPlayTrainer",
     "TrajectoryStep",
     "TrainStats",
     "calcola_margine",
