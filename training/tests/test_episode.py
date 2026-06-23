@@ -44,7 +44,7 @@ class TrackingPolicy:
 
 class TestEpisodeCollection(unittest.TestCase):
     def test_collect_episode_produce_partita_completa(self):
-        # Il collector deve produrre una traiettoria completa e coerente.
+        # The collector must produce a complete and coherent trajectory.
         policy = TrackingPolicy("shared")
 
         episode = collect_episode(
@@ -66,7 +66,7 @@ class TestEpisodeCollection(unittest.TestCase):
         self.assertEqual(episode.learner_squadra, "pari")
 
     def test_global_step_index_del_learner_usa_i_turni_globali(self):
-        # Gli indici del learner devono riferirsi alle 40 mosse globali.
+        # Learner indexes must refer to the 40 global moves.
         policy = TrackingPolicy("shared")
 
         episode = collect_episode(
@@ -91,7 +91,7 @@ class TestEpisodeCollection(unittest.TestCase):
         )
 
     def test_reward_to_go_usa_global_step_index(self):
-        # Con reward solo terminale, ogni decisione vede la stessa reward futura.
+        # With terminal-only reward, each decision sees the same future reward.
         policy = TrackingPolicy("shared")
 
         episode = collect_episode(
@@ -111,7 +111,7 @@ class TestEpisodeCollection(unittest.TestCase):
             self.assertAlmostEqual(step.reward_to_go, episode.episode_return)
 
     def test_dense_presa_aggiunge_reward_intermedie(self):
-        # dense_presa integra reward immediate quando una presa viene completata.
+        # dense_presa integrates immediate rewards when a trick is completed.
         policy = TrackingPolicy("shared")
 
         episode = collect_episode(
@@ -129,7 +129,7 @@ class TestEpisodeCollection(unittest.TestCase):
         self.assertTrue(any(reward != 0.0 for reward in episode.rewards[:-1]))
 
     def test_policy_mapping_usa_distanza_di_turno_dal_learner(self):
-        # Le policy sono assegnate per successivo, compagno e precedente nel turno.
+        # Policies are assigned to next player, teammate, and previous player in turn order.
         learner = TrackingPolicy("learner")
         successivo = TrackingPolicy("successivo")
         compagno = TrackingPolicy("compagno")
@@ -152,7 +152,7 @@ class TestEpisodeCollection(unittest.TestCase):
         self.assertEqual(set(precedente.seen_players), {0})
 
     def test_stesso_seed_ambiente_e_rng_policy_rende_episode_riproducibile(self):
-        # Ambiente e RNG policy separati restano riproducibili se reinizializzati uguali.
+        # Separate environment and policy RNGs remain reproducible when reinitialized equally.
         first_learner = TrackingPolicy("learner", mode="random")
         second_learner = TrackingPolicy("learner", mode="random")
 
@@ -182,7 +182,7 @@ class TestEpisodeCollection(unittest.TestCase):
         self.assertEqual(first.episode_return, second.episode_return)
 
     def test_greedy_non_learner_non_modifica_il_learner(self):
-        # Il learner resta stocastico; greedy_non_learner vale solo per gli altri.
+        # The learner remains stochastic; greedy_non_learner applies only to the others.
         learner = TrackingPolicy("learner")
         successivo = TrackingPolicy("successivo")
         compagno = TrackingPolicy("compagno")
@@ -206,7 +206,7 @@ class TestEpisodeCollection(unittest.TestCase):
         self.assertEqual(set(precedente.greedy_values), {True})
 
     def test_giocatori_invalidi_solleva_value_error(self):
-        # Gli id giocatore non validi vengono rifiutati prima di iniziare l'episodio.
+        # Invalid player ids are rejected before the episode starts.
         policy = TrackingPolicy("shared")
 
         with self.assertRaises(ValueError):

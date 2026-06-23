@@ -59,7 +59,7 @@ def random_policies() -> dict[int, RandomPolicy]:
 
 class TestDecisionLog(unittest.TestCase):
     def test_record_decision_log_produce_partita_completa(self):
-        # Una partita completa deve produrre 40 decisioni e punteggi finali validi.
+        # A complete game must produce 40 decisions and valid final scores.
         log = record_decision_log(
             policies_by_player=random_policies(),
             seed_ambiente=10,
@@ -81,7 +81,7 @@ class TestDecisionLog(unittest.TestCase):
             self.assertIsNone(log.squadra_vincitrice)
 
     def test_record_contiene_osservazione_legale_e_azioni(self):
-        # Il record salva mano, azioni e probabilita' viste prima della scelta.
+        # The record stores the hand, actions, and probabilities seen before the choice.
         log = record_decision_log(
             policies_by_player=random_policies(),
             seed_ambiente=11,
@@ -101,7 +101,7 @@ class TestDecisionLog(unittest.TestCase):
             self.assertEqual(record.giocatore_id, record.osservazione.giocatore_id)
 
     def test_greedy_viene_propagato_alle_policy(self):
-        # Il flag greedy deve arrivare invariato alle policy registrate.
+        # The greedy flag must reach the recorded policies unchanged.
         policies = {giocatore_id: TrackingPolicy() for giocatore_id in range(4)}
 
         log = record_decision_log(
@@ -117,7 +117,7 @@ class TestDecisionLog(unittest.TestCase):
             self.assertEqual(set(policy.greedy_values), {False})
 
     def test_stessi_seed_producono_log_riproducibile(self):
-        # A parita' di seed, giocatori, azioni e punteggi devono ripetersi.
+        # With the same seed, players, actions, and scores must repeat.
         first = record_decision_log(
             policies_by_player=random_policies(),
             seed_ambiente=13,
@@ -154,7 +154,7 @@ class TestDecisionLog(unittest.TestCase):
         self.assertEqual(first_trace, second_trace)
 
     def test_policies_by_player_deve_contenere_quattro_giocatori(self):
-        # Ogni giocatore deve avere una sola policy esplicita.
+        # Each player must have exactly one explicit policy.
         with self.assertRaises(ValueError):
             record_decision_log(
                 policies_by_player={0: RandomPolicy(), 1: RandomPolicy()},
@@ -180,7 +180,7 @@ class TestDecisionLog(unittest.TestCase):
             )
 
     def test_primo_giocatore_non_valido_solleva_value_error(self):
-        # Il primo giocatore della partita deve essere un id valido.
+        # The first player of the game must be a valid id.
         with self.assertRaises(ValueError):
             record_decision_log(
                 policies_by_player=random_policies(),
@@ -191,7 +191,7 @@ class TestDecisionLog(unittest.TestCase):
             )
 
     def test_probabilities_non_allineate_alle_azioni_legali_solleva_value_error(self):
-        # Le probabilita' salvate devono riferirsi solo e tutte alle carte giocabili.
+        # Stored probabilities must refer only and entirely to playable cards.
         policies = random_policies()
         policies[0] = BadProbabilitiesPolicy()
 
@@ -205,7 +205,7 @@ class TestDecisionLog(unittest.TestCase):
             )
 
     def test_policy_che_sceglie_azione_illegale_solleva_value_error(self):
-        # Una carta non presente nella mano viene rifiutata come scelta illegale.
+        # A card not present in the hand is rejected as an illegal choice.
         policies = random_policies()
         policies[0] = IllegalActionPolicy()
 
@@ -219,7 +219,7 @@ class TestDecisionLog(unittest.TestCase):
             )
 
     def test_outcome_non_contiene_osservazione_successiva(self):
-        # L'esito post-mossa non deve includere l'osservazione del prossimo giocatore.
+        # The post-move outcome must not include the next player's observation.
         log = record_decision_log(
             policies_by_player=random_policies(),
             seed_ambiente=18,

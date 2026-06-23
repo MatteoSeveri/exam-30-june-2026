@@ -31,7 +31,7 @@ def log_random():
 
 class TestDiagnosticViews(unittest.TestCase):
     def test_records_for_player_filtra_un_giocatore(self):
-        # La vista per player restituisce solo le 10 decisioni di quel giocatore.
+        # The player view returns only that player's 10 decisions.
         log = log_random()
 
         records = records_for_player(log, 0)
@@ -40,7 +40,7 @@ class TestDiagnosticViews(unittest.TestCase):
         self.assertTrue(all(record.giocatore_id == 0 for record in records))
 
     def test_records_for_policy_filtra_per_nome(self):
-        # La vista per policy name isola i record prodotti da quella policy.
+        # The policy-name view isolates records produced by that policy.
         log = log_random()
 
         records = records_for_policy(log, "random_2")
@@ -49,7 +49,7 @@ class TestDiagnosticViews(unittest.TestCase):
         self.assertTrue(all(record.policy_name == "random_2" for record in records))
 
     def test_records_by_trick_position(self):
-        # Ogni posizione nella presa compare 10 volte in una partita completa.
+        # Each trick position appears 10 times in a complete game.
         log = log_random()
 
         for posizione in range(4):
@@ -64,7 +64,7 @@ class TestDiagnosticViews(unittest.TestCase):
             )
 
     def test_records_with_partner_leading(self):
-        # Ogni record restituito ha il compagno in testa nella presa corrente.
+        # Each returned record has the teammate leading the current trick.
         log = log_random()
 
         records = records_with_partner_leading(log)
@@ -77,7 +77,7 @@ class TestDiagnosticViews(unittest.TestCase):
             self.assertEqual(winner, record.osservazione.compagno_id)
 
     def test_records_with_opponent_leading(self):
-        # Ogni record restituito ha un avversario in testa nella presa corrente.
+        # Each returned record has an opponent leading the current trick.
         log = log_random()
 
         records = records_with_opponent_leading(log)
@@ -90,7 +90,7 @@ class TestDiagnosticViews(unittest.TestCase):
             self.assertIn(winner, record.osservazione.avversari)
 
     def test_records_on_rich_trick(self):
-        # La vista prende solo decisioni dove il campo contiene abbastanza punti.
+        # The view includes only decisions where the table contains enough points.
         log = log_random()
 
         records = records_on_rich_trick(log, min_points=10)
@@ -102,7 +102,7 @@ class TestDiagnosticViews(unittest.TestCase):
             )
 
     def test_records_chosen_with_probability_below(self):
-        # Con RandomPolicy, soglia 0.5 isola scelte con probabilita' sotto 1/2.
+        # With RandomPolicy, threshold 0.5 isolates choices with probability below 1/2.
         log = log_random()
 
         records = records_chosen_with_probability_below(log, threshold=0.5)
@@ -112,21 +112,21 @@ class TestDiagnosticViews(unittest.TestCase):
             self.assertLess(record.action_probabilities[record.azione], 0.5)
 
     def test_records_for_player_rifiuta_id_non_valido(self):
-        # In Briscola a 4 i giocatori validi sono 0, 1, 2 e 3.
+        # In 4-player Briscola, valid players are 0, 1, 2, and 3.
         log = log_random()
 
         with self.assertRaises(ValueError):
             records_for_player(log, 4)
 
     def test_records_by_trick_position_rifiuta_posizione_non_valida(self):
-        # Le posizioni valide nella presa sono 0, 1, 2 e 3.
+        # Valid positions in the trick are 0, 1, 2, and 3.
         log = log_random()
 
         with self.assertRaises(ValueError):
             records_by_trick_position(log, 4)
 
     def test_records_chosen_with_probability_below_rifiuta_soglia_negativa(self):
-        # Una soglia negativa non ha significato per probabilita' tra 0 e 1.
+        # A negative threshold has no meaning for probabilities between 0 and 1.
         log = log_random()
 
         with self.assertRaises(ValueError):

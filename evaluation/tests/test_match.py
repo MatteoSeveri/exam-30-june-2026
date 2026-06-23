@@ -41,7 +41,7 @@ def random_policies() -> dict[int, RandomPolicy]:
 
 class TestPlayMatch(unittest.TestCase):
     def test_play_match_produce_risultato_completo(self):
-        # Una evaluation match deve chiudere una partita integra senza training.
+        # An evaluation match must complete a full game without training.
         result = play_match(
             policies_by_player=random_policies(),
             seed_ambiente=10,
@@ -67,7 +67,7 @@ class TestPlayMatch(unittest.TestCase):
         self.assertEqual(result.primo_giocatore_id, 0)
 
     def test_stessi_seed_producono_stesso_risultato(self):
-        # Ambiente e tie-break delle policy sono riproducibili se i seed coincidono.
+        # Environment and policy tie-breaks are reproducible when seeds match.
         first = play_match(
             policies_by_player=random_policies(),
             seed_ambiente=11,
@@ -86,7 +86,7 @@ class TestPlayMatch(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_policy_per_giocatore_e_greedy_forzato(self):
-        # Ogni policy vede solo il proprio giocatore e riceve greedy=True.
+        # Each policy sees only its own player and receives greedy=True.
         policies = {
             giocatore_id: TrackingPolicy(name=f"policy_{giocatore_id}")
             for giocatore_id in range(4)
@@ -106,7 +106,7 @@ class TestPlayMatch(unittest.TestCase):
             self.assertEqual(set(policy.greedy_values), {True})
 
     def test_policies_by_player_deve_contenere_quattro_giocatori(self):
-        # La sandbox non deduce posti mancanti o extra.
+        # The sandbox does not infer missing or extra seats.
         with self.assertRaises(ValueError):
             play_match(
                 policies_by_player={0: RandomPolicy(), 1: RandomPolicy()},
@@ -132,7 +132,7 @@ class TestPlayMatch(unittest.TestCase):
             )
 
     def test_primo_giocatore_non_valido_solleva_value_error(self):
-        # La rotazione deve restare esplicita e valida.
+        # Rotation must remain explicit and valid.
         with self.assertRaises(ValueError):
             play_match(
                 policies_by_player=random_policies(),
@@ -143,7 +143,7 @@ class TestPlayMatch(unittest.TestCase):
             )
 
     def test_play_match_passa_anche_greedy_false_quando_richiesto(self):
-        # match.py esegue il protocollo ricevuto, senza imporre greedy da solo.
+        # match.py runs the received protocol without forcing greedy mode itself.
         policies = {
             giocatore_id: TrackingPolicy(name=f"policy_{giocatore_id}")
             for giocatore_id in range(4)

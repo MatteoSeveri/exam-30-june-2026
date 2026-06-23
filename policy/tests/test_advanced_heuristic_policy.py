@@ -46,7 +46,7 @@ def osservazione(
 
 class TestAdvancedHeuristicPolicy(unittest.TestCase):
     def test_apre_con_scarto_meno_costoso(self):
-        # A presa vuota conserva punti e briscole.
+        # On an empty trick, it preserves points and briscola cards.
         scarto = Carta("bastoni", "due")
         obs = osservazione(
             mano=(
@@ -62,7 +62,7 @@ class TestAdvancedHeuristicPolicy(unittest.TestCase):
         self.assertEqual(action, scarto)
 
     def test_compagno_prende_non_ultimo_lascia_compagno_in_testa(self):
-        # Se un avversario deve ancora giocare, non carica e non supera il compagno.
+        # If an opponent still has to play, it does not load points or overtake the teammate.
         scarto = Carta("bastoni", "due")
         obs = osservazione(
             mano=(
@@ -83,7 +83,7 @@ class TestAdvancedHeuristicPolicy(unittest.TestCase):
         self.assertEqual(action, scarto)
 
     def test_compagno_prende_ultimo_carica_con_carico_non_briscola(self):
-        # Da ultimo puo' caricare punti sulla presa della squadra senza rischio.
+        # When playing last, it can load points onto the team's trick without risk.
         carico = Carta("bastoni", "asso")
         obs = osservazione(
             mano=(
@@ -104,7 +104,7 @@ class TestAdvancedHeuristicPolicy(unittest.TestCase):
         self.assertEqual(action, carico)
 
     def test_avversario_prende_ultimo_gioca_carico_non_briscola_che_prende(self):
-        # Da ultimo puo' prendere con un carico non briscola per metterlo al sicuro.
+        # When playing last, it can win with a non-briscola point card to secure it.
         carico_che_prende = Carta("coppe", "asso")
         obs = osservazione(
             mano=(
@@ -125,7 +125,7 @@ class TestAdvancedHeuristicPolicy(unittest.TestCase):
         self.assertEqual(action, carico_che_prende)
 
     def test_avversario_prende_ultimo_su_presa_povera_non_spende_briscola(self):
-        # Su presa povera non spende briscola se non puo' prendere senza briscola.
+        # On a low-value trick, it does not spend a briscola if it cannot win without one.
         scarto = Carta("bastoni", "due")
         obs = osservazione(
             mano=(
@@ -146,7 +146,7 @@ class TestAdvancedHeuristicPolicy(unittest.TestCase):
         self.assertEqual(action, scarto)
 
     def test_avversario_prende_non_ultimo_su_presa_ricca_spende_briscola_bassa(self):
-        # Su presa ricca e non da ultimo, una briscola bassa forza l'avversario dopo.
+        # On a high-value trick and not playing last, a low briscola pressures the next opponent.
         briscola_bassa = Carta("denari", "due")
         obs = osservazione(
             mano=(
@@ -165,7 +165,7 @@ class TestAdvancedHeuristicPolicy(unittest.TestCase):
         self.assertEqual(action, briscola_bassa)
 
     def test_avversario_prende_non_ultimo_su_presa_povera_prende_senza_carico_o_briscola(self):
-        # Su presa povera prende solo se basta una carta non carico e non briscola.
+        # On a low-value trick, it wins only if a non-point, non-briscola card is enough.
         presa_povera = Carta("coppe", "sette")
         obs = osservazione(
             mano=(
@@ -184,7 +184,7 @@ class TestAdvancedHeuristicPolicy(unittest.TestCase):
         self.assertEqual(action, presa_povera)
 
     def test_probabilita_divise_tra_carte_migliori_equivalenti(self):
-        # Le carte equivalenti restano entrambe disponibili alla scelta stocastica.
+        # Equivalent cards both remain available for stochastic selection.
         primo_scarto = Carta("coppe", "due")
         secondo_scarto = Carta("bastoni", "due")
         briscola = Carta("denari", "due")
@@ -199,7 +199,7 @@ class TestAdvancedHeuristicPolicy(unittest.TestCase):
         self.assertAlmostEqual(sum(probabilities.values()), 1.0)
 
     def test_mano_vuota_solleva_value_error(self):
-        # Una policy non puo' scegliere se non ci sono azioni legali.
+        # A policy cannot choose if there are no legal actions.
         obs = osservazione(mano=())
         policy = AdvancedHeuristicPolicy()
 

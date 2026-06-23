@@ -34,7 +34,7 @@ def match_result(pari: int, dispari: int) -> MatchResult:
 
 class TestEvaluationSuite(unittest.TestCase):
     def test_make_evaluation_cases_ruota_primo_giocatore(self):
-        # Ogni caso e' una partita indipendente con apertura bilanciata.
+        # Each case is an independent game with balanced opening positions.
         cases = make_evaluation_cases(
             games=6,
             seed_ambiente_start=100,
@@ -54,7 +54,7 @@ class TestEvaluationSuite(unittest.TestCase):
         )
 
     def test_make_evaluation_cases_rifiuta_games_non_positivo(self):
-        # Una suite senza partite non produce metriche interpretabili.
+        # A suite without games does not produce interpretable metrics.
         with self.assertRaises(ValueError):
             make_evaluation_cases(
                 games=0,
@@ -63,7 +63,7 @@ class TestEvaluationSuite(unittest.TestCase):
             )
 
     def test_default_evaluation_suite_ha_scenari_stabili(self):
-        # I nomi dei benchmark default devono restare leggibili e prevedibili.
+        # Default benchmark names must remain readable and predictable.
         suite = default_evaluation_suite()
 
         self.assertEqual(
@@ -78,7 +78,7 @@ class TestEvaluationSuite(unittest.TestCase):
         )
 
     def test_evaluate_learner_scenario_mappa_i_ruoli_dal_learner(self):
-        # La suite valuta learner, avversario successivo, compagno e precedente.
+        # The suite evaluates learner, next opponent, teammate, and previous opponent.
         learner = FakePolicy("learner")
         scenario = EvaluationScenario(
             name="custom",
@@ -110,7 +110,7 @@ class TestEvaluationSuite(unittest.TestCase):
         self.assertTrue(play.call_args.kwargs["greedy"])
 
     def test_margine_metriche_usa_prospettiva_del_learner(self):
-        # Se il learner e' dispari, il margine deve essere dispari meno pari.
+        # If the learner is odd, the margin must be odd minus even.
         learner = FakePolicy("learner")
         scenario = EvaluationScenario(
             name="custom",
@@ -144,7 +144,7 @@ class TestEvaluationSuite(unittest.TestCase):
         self.assertEqual(result.metrics.loss_rate, 0.5)
 
     def test_evaluate_suite_esegue_tutti_gli_scenari(self):
-        # La suite restituisce un risultato per ogni scenario configurato.
+        # The suite returns one result for each configured scenario.
         learner = FakePolicy("learner")
         suite = EvaluationSuite(
             scenarios=(
@@ -179,7 +179,7 @@ class TestEvaluationSuite(unittest.TestCase):
         self.assertEqual(results["second"].metrics.mean_point_difference, 20.0)
 
     def test_greedy_false_viene_propagato_al_match(self):
-        # La suite default e' greedy, ma puo' orchestrare evaluation stocastiche.
+        # The default suite is greedy, but it can orchestrate stochastic evaluations.
         learner = FakePolicy("learner")
         scenario = EvaluationScenario(
             name="custom",
@@ -203,7 +203,7 @@ class TestEvaluationSuite(unittest.TestCase):
         self.assertFalse(play.call_args.kwargs["greedy"])
 
     def test_casi_invalidi_solleva_value_error(self):
-        # Serve almeno un caso valido e un learner id nel range 0..3.
+        # At least one valid case and a learner id in range 0..3 are required.
         learner = FakePolicy("learner")
         scenario = EvaluationScenario(
             name="custom",

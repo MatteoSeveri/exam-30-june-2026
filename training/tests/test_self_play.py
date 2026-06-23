@@ -72,7 +72,7 @@ def stats_finte(episodes: int) -> TrainStats:
 
 class TestSelfPlayConfig(unittest.TestCase):
     def test_config_default_e_valori_validi(self):
-        # I default descrivono un loop configurabile ma non un runner completo.
+        # Defaults describe a configurable loop, but not a complete runner.
         config = SelfPlayConfig()
 
         self.assertEqual(config.batch_size, 500)
@@ -83,7 +83,7 @@ class TestSelfPlayConfig(unittest.TestCase):
         self.assertFalse(config.greedy_non_learner)
 
     def test_config_rifiuta_valori_illegali(self):
-        # Fail-fast su batch, snapshot interval e id giocatore.
+        # Fail fast on batch, snapshot interval, and player id.
         with self.assertRaises(ValueError):
             SelfPlayConfig(batch_size=0)
 
@@ -99,7 +99,7 @@ class TestSelfPlayConfig(unittest.TestCase):
 
 class TestSelfPlayTrainer(unittest.TestCase):
     def test_pool_vuoto_riceve_snapshot_initial(self):
-        # Il trainer garantisce un pool campionabile prima del primo episodio.
+        # The trainer guarantees a sampleable pool before the first episode.
         learner = FakePolicy("learner")
         pool = FakePool()
 
@@ -109,7 +109,7 @@ class TestSelfPlayTrainer(unittest.TestCase):
         self.assertEqual([snapshot.name for snapshot in pool.snapshots], ["initial"])
 
     def test_primo_giocatore_ruota_in_modo_bilanciato_nel_batch(self):
-        # La rotazione bilancia chi apre la partita prima dell'unico update.
+        # Rotation balances who opens the game before the single update.
         learner = FakePolicy("learner")
         pool = FakePool(snapshots=[FakePolicy("initial")])
         config = SelfPlayConfig(batch_size=8, snapshot_interval=99)
@@ -140,7 +140,7 @@ class TestSelfPlayTrainer(unittest.TestCase):
         self.assertEqual(len(reinforce.call_args.args[1]), 8)
 
     def test_config_reward_reinforce_e_greedy_passano_ai_blocchi_giusti(self):
-        # self_play inoltra le config senza reinterpretarle.
+        # self_play forwards configs without reinterpreting them.
         learner = FakePolicy("learner")
         pool = FakePool(snapshots=[FakePolicy("initial")])
         reward_config = RewardConfig(mode="dense_presa", lambda_margin=0.4)
@@ -173,7 +173,7 @@ class TestSelfPlayTrainer(unittest.TestCase):
         self.assertIs(reinforce.call_args.args[2], reinforce_config)
 
     def test_snapshot_viene_aggiunto_solo_all_intervallo_configurato(self):
-        # Il pool cresce solo quando update_index raggiunge snapshot_interval.
+        # The pool grows only when update_index reaches snapshot_interval.
         learner = FakePolicy("learner")
         pool = FakePool()
         config = SelfPlayConfig(batch_size=4, snapshot_interval=2)
@@ -196,7 +196,7 @@ class TestSelfPlayTrainer(unittest.TestCase):
         self.assertEqual(second.pool_size, 2)
 
     def test_master_seed_rende_riproducibili_seed_ambiente_e_policy(self):
-        # Un solo seed del trainer riproduce sia ambiente sia sampling policy.
+        # A single trainer seed reproduces both environment and policy sampling.
         def seed_trace(seed: int) -> list[tuple[int, float]]:
             learner = FakePolicy("learner")
             pool = FakePool(snapshots=[FakePolicy("initial")])
@@ -230,7 +230,7 @@ class TestSelfPlayTrainer(unittest.TestCase):
         self.assertNotEqual(seed_trace(123), seed_trace(456))
 
     def test_pool_viene_campionato_tre_volte_per_episodio(self):
-        # Le tre pescate sono separate, anche se possono restituire lo stesso snapshot.
+        # The three draws are separate, even if they can return the same snapshot.
         learner = FakePolicy("learner")
         shared_policy = FakePolicy("shared_snapshot")
         pool = FakePool(
@@ -257,7 +257,7 @@ class TestSelfPlayTrainer(unittest.TestCase):
             self.assertIs(call.kwargs["avversario_precedente_policy"], shared_policy)
 
     def test_train_esegue_piu_update_e_rifiuta_valore_negativo(self):
-        # train(updates) e' solo una ripetizione esplicita di train_update.
+        # train(updates) is only an explicit repetition of train_update.
         learner = FakePolicy("learner")
         pool = FakePool()
         config = SelfPlayConfig(batch_size=4, snapshot_interval=99)

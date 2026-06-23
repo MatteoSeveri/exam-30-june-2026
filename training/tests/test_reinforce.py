@@ -100,7 +100,7 @@ def episodio(
 
 class TestReinforceUpdate(unittest.TestCase):
     def test_config_default_e_valori_validi(self):
-        # I default dichiarano la baseline scelta e clipping disattivato.
+        # Defaults declare the chosen baseline and disabled clipping.
         config = ReinforceConfig()
 
         self.assertEqual(config.learning_rate, 0.01)
@@ -110,7 +110,7 @@ class TestReinforceUpdate(unittest.TestCase):
         self.assertEqual(ReinforceConfig(baseline="batch_mean").baseline, "batch_mean")
 
     def test_config_rifiuta_valori_illegali(self):
-        # Fail-fast sugli iperparametri dell'update.
+        # Fail fast on update hyperparameters.
         with self.assertRaises(ValueError):
             ReinforceConfig(learning_rate=-0.1)
 
@@ -121,7 +121,7 @@ class TestReinforceUpdate(unittest.TestCase):
             ReinforceConfig(max_update_norm=-1.0)
 
     def test_baseline_none_usa_zero(self):
-        # Senza baseline, il gradiente usa direttamente i reward_to_go.
+        # Without a baseline, the gradient uses reward_to_go directly.
         policy = FakeLinearPolicy(theta=np.asarray([0.0], dtype=np.float32))
 
         stats = reinforce_update(
@@ -134,7 +134,7 @@ class TestReinforceUpdate(unittest.TestCase):
         self.assertAlmostEqual(float(policy.applied_gradient[0]), 5.0)
 
     def test_batch_mean_produce_una_baseline_globale(self):
-        # batch_mean sottrae la stessa media a tutte le decisioni.
+        # batch_mean subtracts the same mean from all decisions.
         policy = FakeLinearPolicy(theta=np.asarray([0.0], dtype=np.float32))
 
         stats = reinforce_update(
@@ -147,7 +147,7 @@ class TestReinforceUpdate(unittest.TestCase):
         self.assertAlmostEqual(float(policy.applied_gradient[0]), 0.0)
 
     def test_time_dependent_produce_una_baseline_per_indice_decisionale(self):
-        # time_dependent confronta ogni decisione con la stessa posizione nel batch.
+        # time_dependent compares each decision with the same position in the batch.
         policy = FakeLinearPolicy(theta=np.asarray([0.0], dtype=np.float32))
 
         stats = reinforce_update(
@@ -160,7 +160,7 @@ class TestReinforceUpdate(unittest.TestCase):
         self.assertAlmostEqual(float(policy.applied_gradient[0]), 0.0)
 
     def test_update_modifica_theta_e_propaga_config(self):
-        # L'update applica gradiente, learning rate e clipping opzionale alla policy.
+        # The update applies gradient, learning rate, and optional clipping to the policy.
         policy = FakeLinearPolicy(theta=np.asarray([0.0], dtype=np.float32))
 
         reinforce_update(
@@ -179,7 +179,7 @@ class TestReinforceUpdate(unittest.TestCase):
         self.assertAlmostEqual(float(policy.theta[0]), 1.0)
 
     def test_gradiente_normalizzato_per_episodi_non_per_step(self):
-        # Un episodio con 10 decisioni non divide l'accumulo per 10.
+        # An episode with 10 decisions does not divide the accumulation by 10.
         policy = FakeLinearPolicy(theta=np.asarray([0.0], dtype=np.float32))
 
         reinforce_update(
@@ -191,7 +191,7 @@ class TestReinforceUpdate(unittest.TestCase):
         self.assertAlmostEqual(float(policy.applied_gradient[0]), 10.0)
 
     def test_train_stats_riassume_batch(self):
-        # Le statistiche restano separate da evaluation e pool retention.
+        # Statistics remain separate from evaluation and pool retention.
         policy = FakeLinearPolicy(theta=np.asarray([0.0], dtype=np.float32))
 
         stats = reinforce_update(
@@ -210,14 +210,14 @@ class TestReinforceUpdate(unittest.TestCase):
         self.assertEqual(stats.baseline, "none")
 
     def test_episodi_vuoti_solleva_value_error(self):
-        # Un update senza episodi non ha significato statistico.
+        # An update without episodes has no statistical meaning.
         policy = FakeLinearPolicy(theta=np.asarray([0.0], dtype=np.float32))
 
         with self.assertRaises(ValueError):
             reinforce_update(policy, [])  # type: ignore[arg-type]
 
     def test_episodi_senza_step_solleva_value_error(self):
-        # Un update senza decisioni learner non puo' costruire il gradiente.
+        # An update without learner decisions cannot build the gradient.
         policy = FakeLinearPolicy(theta=np.asarray([0.0], dtype=np.float32))
 
         with self.assertRaises(ValueError):

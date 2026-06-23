@@ -58,7 +58,7 @@ def feature(extractor: BriscolaFeatureExtractor, values: list[float], name: str)
 
 class TestBriscolaFeatureExtractor(unittest.TestCase):
     def test_feature_vector_has_expected_size(self):
-        # Il vettore estratto deve rispettare la dimensione dichiarata.
+        # The extracted vector must match the declared size.
         extractor = BriscolaFeatureExtractor()
         obs = osservazione()
 
@@ -67,7 +67,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
         self.assertEqual(len(values), extractor.size())
 
     def test_features_are_floats(self):
-        # La policy lineare lavora su un vettore numerico uniforme.
+        # The linear policy works on a uniform numeric vector.
         extractor = BriscolaFeatureExtractor()
         obs = osservazione()
 
@@ -76,7 +76,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
         self.assertTrue(all(isinstance(value, float) for value in values))
 
     def test_carta_non_legale_solleva_value_error(self):
-        # Le feature sono definite solo per azioni legali nella mano corrente.
+        # Features are defined only for legal actions in the current hand.
         extractor = BriscolaFeatureExtractor()
         obs = osservazione()
 
@@ -84,7 +84,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
             extractor.extract(obs, Carta("spade", "asso"))
 
     def test_feature_di_carta(self):
-        # Punti, forza e tipo carta devono essere codificati direttamente.
+        # Points, strength, and card type must be encoded directly.
         extractor = BriscolaFeatureExtractor()
         carta = Carta("denari", "tre")
         obs = osservazione(mano=(carta,))
@@ -102,7 +102,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
         self.assertEqual(feature(extractor, values, "carta_liscia"), 0.0)
 
     def test_feature_di_presa_quando_avversario_prende_e_carta_supera(self):
-        # Se una carta prende su un avversario, la presa candidata va riconosciuta.
+        # If a card wins over an opponent, the candidate trick must be recognized.
         extractor = BriscolaFeatureExtractor()
         carta = Carta("coppe", "asso")
         obs = osservazione(
@@ -119,7 +119,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
         self.assertEqual(feature(extractor, values, "carta_supera_avversario"), 1.0)
 
     def test_mano_compagno_nascosta_non_alimenta_feature_derivate(self):
-        # La mano del compagno nascosta non deve produrre informazione derivata.
+        # A hidden teammate hand must not produce derived information.
         extractor = BriscolaFeatureExtractor()
         obs = osservazione(
             mano_compagno_visibile=False,
@@ -134,7 +134,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
         self.assertEqual(feature(extractor, values, "compagno_ha_briscola"), 0.0)
 
     def test_mano_compagno_visibile_alimenta_feature_derivate(self):
-        # La mano del compagno diventa usabile solo quando e' legalmente visibile.
+        # The teammate hand becomes usable only when it is legally visible.
         extractor = BriscolaFeatureExtractor()
         obs = osservazione(
             mano_compagno_visibile=True,
@@ -156,7 +156,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
         self.assertEqual(feature(extractor, values, "compagno_ha_carico"), 1.0)
 
     def test_briscola_esposta_avversario_se_pescata_e_non_giocata(self):
-        # Una briscola esposta pescata e non giocata resta informazione pubblica.
+        # A drawn and unplayed exposed briscola remains public information.
         extractor = BriscolaFeatureExtractor()
         briscola_esposta = Carta("denari", "asso")
         obs = osservazione(
@@ -177,7 +177,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
         )
 
     def test_briscola_esposta_giocata_non_viene_attribuita_al_proprietario(self):
-        # Una briscola gia' giocata non va piu' attribuita al suo proprietario.
+        # An already played exposed briscola must no longer be attributed to its owner.
         extractor = BriscolaFeatureExtractor()
         briscola_esposta = Carta("denari", "asso")
         obs = osservazione(
@@ -199,7 +199,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
         )
 
     def test_briscole_che_battono_non_osservate_per_carta_non_briscola(self):
-        # Una non briscola puo' essere battuta da qualunque briscola non osservata.
+        # A non-briscola card can be beaten by any unobserved briscola.
         extractor = BriscolaFeatureExtractor()
         carta = Carta("coppe", "due")
         obs = osservazione(mano=(carta,))
@@ -212,7 +212,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
         )
 
     def test_briscole_che_battono_non_osservate_per_briscola_conta_solo_superiori(self):
-        # Una briscola teme solo briscole non osservate con forza superiore.
+        # A briscola card is threatened only by stronger unobserved briscola cards.
         extractor = BriscolaFeatureExtractor()
         carta = Carta("denari", "re")
         obs = osservazione(mano=(carta,))
@@ -225,7 +225,7 @@ class TestBriscolaFeatureExtractor(unittest.TestCase):
         )
 
     def test_feature_di_punteggio_e_fase(self):
-        # Le feature quantitative di contesto devono stare su scala coerente.
+        # Quantitative context features must use a consistent scale.
         extractor = BriscolaFeatureExtractor()
         obs = osservazione(
             punteggio_squadra=70,

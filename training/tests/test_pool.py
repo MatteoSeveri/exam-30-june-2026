@@ -19,7 +19,7 @@ def policy_con_theta(
 
 class TestSnapshotPool(unittest.TestCase):
     def test_add_policy_copia_theta_e_congela_snapshot(self):
-        # Lo snapshot non deve cambiare se la policy viva viene aggiornata dopo.
+        # The snapshot must not change if the live policy is updated later.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         policy = policy_con_theta([1.0], extractor, "learner")
         pool = SnapshotPool(feature_extractor=extractor)
@@ -34,7 +34,7 @@ class TestSnapshotPool(unittest.TestCase):
         self.assertFalse(pool.snapshots[0].theta.flags.writeable)
 
     def test_sample_policy_restituisce_policy_indipendente(self):
-        # Ogni campionamento deve avere memoria theta separata dallo snapshot.
+        # Each sample must have theta memory separate from the snapshot.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         policy = policy_con_theta([2.0], extractor, "learner")
         pool = SnapshotPool(feature_extractor=extractor)
@@ -54,7 +54,7 @@ class TestSnapshotPool(unittest.TestCase):
         )
 
     def test_due_sample_dallo_stesso_snapshot_non_condividono_theta(self):
-        # Due giocatori che pescano lo stesso snapshot non devono condividere memoria.
+        # Two players drawing the same snapshot must not share memory.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         policy = policy_con_theta([3.0], extractor, "learner")
         pool = SnapshotPool(feature_extractor=extractor)
@@ -68,7 +68,7 @@ class TestSnapshotPool(unittest.TestCase):
         self.assertFalse(np.shares_memory(first.theta, second.theta))
 
     def test_sample_policy_su_pool_vuoto_solleva_value_error(self):
-        # Il campionamento da pool vuoto e' un errore di configurazione.
+        # Sampling from an empty pool is a configuration error.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         pool = SnapshotPool(feature_extractor=extractor)
 
@@ -76,14 +76,14 @@ class TestSnapshotPool(unittest.TestCase):
             pool.sample_policy(random.Random(0))
 
     def test_max_size_minore_di_uno_solleva_value_error(self):
-        # Il pool deve poter conservare almeno uno snapshot.
+        # The pool must be able to keep at least one snapshot.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
 
         with self.assertRaises(ValueError):
             SnapshotPool(feature_extractor=extractor, max_size=0)
 
     def test_retention_conserva_initial_e_recenti(self):
-        # La retention minimale conserva initial e gli snapshot piu' recenti.
+        # Minimal retention keeps initial and the most recent snapshots.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         pool = SnapshotPool(feature_extractor=extractor, max_size=4, keep_initial=True)
 
@@ -100,7 +100,7 @@ class TestSnapshotPool(unittest.TestCase):
         )
 
     def test_retention_senza_initial_conserva_solo_recenti(self):
-        # Se keep_initial e' falso, il pool tiene semplicemente gli ultimi snapshot.
+        # If keep_initial is false, the pool simply keeps the latest snapshots.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         pool = SnapshotPool(feature_extractor=extractor, max_size=3, keep_initial=False)
 
@@ -117,7 +117,7 @@ class TestSnapshotPool(unittest.TestCase):
         )
 
     def test_retention_non_ha_logica_di_score(self):
-        # Il pool minimale conserva initial+recenti, senza campi di valutazione.
+        # The minimal pool keeps initial+recent snapshots, without evaluation fields.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         pool = SnapshotPool(feature_extractor=extractor, max_size=3, keep_initial=True)
 

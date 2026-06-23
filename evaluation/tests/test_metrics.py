@@ -8,7 +8,7 @@ from evaluation.metrics import compute_metrics, standard_error
 
 class TestEvaluationMetrics(unittest.TestCase):
     def test_compute_metrics_usa_una_partita_come_unita_statistica(self):
-        # Win/draw/loss e margine sono calcolati sui margini per partita.
+        # Win/draw/loss and margin are computed from per-match margins.
         metrics = compute_metrics([10, -4, 0, 14])
 
         self.assertEqual(metrics.games, 4)
@@ -18,13 +18,13 @@ class TestEvaluationMetrics(unittest.TestCase):
         self.assertEqual(metrics.mean_point_difference, 5.0)
 
     def test_standard_error_usa_deviazione_campionaria(self):
-        # Con pochi match usiamo stdev campionaria, non deviazione di popolazione.
+        # With few matches, we use sample stdev, not population deviation.
         values = [2, 4, 6]
 
         self.assertAlmostEqual(standard_error(values), 2.0 / math.sqrt(3))
 
     def test_confidence_interval_95_centrato_sulla_media(self):
-        # La CI e' simmetrica rispetto al margine medio stimato.
+        # The CI is symmetric around the estimated mean margin.
         metrics = compute_metrics([2, 4, 6])
         expected_stderr = 2.0 / math.sqrt(3)
 
@@ -39,7 +39,7 @@ class TestEvaluationMetrics(unittest.TestCase):
         )
 
     def test_partita_singola_ha_standard_error_zero(self):
-        # Con una sola unita' statistica non stimiamo varianza tra partite.
+        # With a single statistical unit, we do not estimate between-match variance.
         metrics = compute_metrics([12])
 
         self.assertEqual(metrics.games, 1)
@@ -48,7 +48,7 @@ class TestEvaluationMetrics(unittest.TestCase):
         self.assertEqual(metrics.confidence_interval_95, (12.0, 12.0))
 
     def test_input_vuoto_solleva_value_error(self):
-        # Metriche senza partite sarebbero numericamente arbitrarie.
+        # Metrics without matches would be numerically arbitrary.
         with self.assertRaises(ValueError):
             compute_metrics([])
 

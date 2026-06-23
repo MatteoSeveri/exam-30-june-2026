@@ -47,7 +47,7 @@ def osservazione(
 
 class TestLinearSoftmaxPolicy(unittest.TestCase):
     def test_initialize_crea_theta_della_dimensione_feature(self):
-        # Il learner deve avere un parametro per ogni feature.
+        # The learner must have one parameter for each feature.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso", "carta_tre"])
 
         policy = LinearSoftmaxPolicy.initialize(extractor, rng=random.Random(0))
@@ -57,14 +57,14 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
         self.assertIs(policy.feature_extractor, extractor)
 
     def test_theta_con_dimensione_errata_solleva_value_error(self):
-        # Evita bug silenziosi dove dot product e feature hanno lunghezze diverse.
+        # This prevents silent bugs where the dot product and features have different lengths.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
 
         with self.assertRaises(ValueError):
             LinearSoftmaxPolicy(theta=[0.0, 1.0], feature_extractor=extractor)
 
     def test_probabilita_sommano_a_uno_sulle_carte_legali(self):
-        # La softmax deve restituire una distribuzione solo sulle azioni legali.
+        # Softmax must return a distribution only over legal actions.
         obs = osservazione()
         policy = LinearSoftmaxPolicy.initialize(
             BriscolaFeatureExtractor(),
@@ -77,7 +77,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
         self.assertAlmostEqual(sum(probabilities.values()), 1.0, delta=1e-6)
 
     def test_softmax_resta_stabile_con_preferenze_grandi(self):
-        # Sottrarre la preferenza massima evita overflow numerico.
+        # Subtracting the maximum preference prevents numeric overflow.
         obs = osservazione(mano=(Carta("coppe", "asso"), Carta("bastoni", "due")))
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         policy = LinearSoftmaxPolicy(theta=[1000.0], feature_extractor=extractor)
@@ -88,7 +88,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
         self.assertTrue(all(math.isfinite(value) for value in probabilities.values()))
 
     def test_greedy_sceglie_la_carta_con_probabilita_massima(self):
-        # In modalita' greedy la policy usa argmax invece del campionamento.
+        # In greedy mode, the policy uses argmax instead of sampling.
         asso = Carta("coppe", "asso")
         due = Carta("bastoni", "due")
         obs = osservazione(mano=(asso, due))
@@ -100,7 +100,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
         self.assertEqual(action, asso)
 
     def test_select_action_stocastico_restituisce_carta_legale(self):
-        # In modalita' stocastica campiona dalla distribuzione sulle azioni legali.
+        # In stochastic mode, it samples from the distribution over legal actions.
         obs = osservazione()
         policy = LinearSoftmaxPolicy.initialize(
             BriscolaFeatureExtractor(),
@@ -112,7 +112,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
         self.assertIn(action, obs.azioni_legali)
 
     def test_log_probability_corrisponde_al_log_della_probabilita(self):
-        # La log-probability serve poi al policy gradient.
+        # The log probability is later used by the policy gradient.
         asso = Carta("coppe", "asso")
         due = Carta("bastoni", "due")
         obs = osservazione(mano=(asso, due))
@@ -124,7 +124,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
         self.assertAlmostEqual(log_probability, math.log(0.5))
 
     def test_grad_log_probability_ha_dimensione_theta_e_valore_atteso(self):
-        # Per softmax lineare il gradiente e' feature azione meno feature attese.
+        # For linear softmax, the gradient is action features minus expected features.
         asso = Carta("coppe", "asso")
         due = Carta("bastoni", "due")
         obs = osservazione(mano=(asso, due))
@@ -137,7 +137,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
         self.assertAlmostEqual(gradient[0], 0.5)
 
     def test_action_non_legale_solleva_value_error_per_log_e_gradiente(self):
-        # Log-probability e gradiente sono definiti solo su azioni legali.
+        # Log probability and gradient are defined only for legal actions.
         obs = osservazione()
         policy = LinearSoftmaxPolicy.initialize(
             BriscolaFeatureExtractor(),
@@ -152,7 +152,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
             policy.grad_log_probability(obs, illegal_action)
 
     def test_apply_gradient_aggiorna_theta(self):
-        # L'update modifica i parametri nella direzione del gradiente.
+        # The update changes the parameters in the gradient direction.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         policy = LinearSoftmaxPolicy(theta=[0.0], feature_extractor=extractor)
 
@@ -160,8 +160,8 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
 
         self.assertAlmostEqual(policy.theta[0], 0.2)
 
-    # Il clipping resta supportato dal codice, ma non entra nel protocollo iniziale.
-    # Lo riattiviamo come test quando scegliamo una soglia sperimentale motivata.
+    # Clipping remains supported by the code, but it is not part of the initial protocol.
+    # We will re-enable it as a test once we choose a justified experimental threshold.
     # def test_apply_gradient_puo_clippare_la_norma(self):
     #     extractor = BriscolaFeatureExtractor(feature_names=["carta_asso", "carta_tre"])
     #     policy = LinearSoftmaxPolicy(theta=[0.0, 0.0], feature_extractor=extractor)
@@ -172,7 +172,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
     #     self.assertAlmostEqual(policy.theta[1], 0.8)
 
     def test_apply_gradient_con_dimensione_errata_solleva_value_error(self):
-        # Il gradiente deve avere una componente per ogni parametro.
+        # The gradient must have one component for each parameter.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         policy = LinearSoftmaxPolicy(theta=[0.0], feature_extractor=extractor)
 
@@ -180,7 +180,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
             policy.apply_gradient([1.0, 2.0], learning_rate=0.1)
 
     def test_copy_duplica_theta_ma_mantiene_feature_extractor(self):
-        # Gli snapshot devono avere parametri indipendenti ma stessa codifica feature.
+        # Snapshots must have independent parameters but the same feature encoding.
         extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
         policy = LinearSoftmaxPolicy(theta=[1.0], feature_extractor=extractor)
 
@@ -194,7 +194,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
         self.assertIs(copied.feature_extractor, extractor)
 
     def test_add_scaled_in_place_aggiorna_vettore_target(self):
-        # Questo helper serve ad accumulare gradienti senza creare nuovi vettori.
+        # This helper accumulates gradients without creating new vectors.
         target = np.asarray([1.0, 2.0], dtype=np.float32)
 
         add_scaled_in_place(target, [3.0, 4.0], scale=0.5)
@@ -202,7 +202,7 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
         self.assertTrue(np.allclose(target, np.asarray([2.5, 4.0], dtype=np.float32)))
 
     def test_mano_vuota_solleva_value_error(self):
-        # Una distribuzione softmax richiede almeno una azione legale.
+        # A softmax distribution requires at least one legal action.
         obs = osservazione(mano=())
         policy = LinearSoftmaxPolicy.initialize(
             BriscolaFeatureExtractor(),
