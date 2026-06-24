@@ -42,6 +42,8 @@ def osservazione_con_mano() -> Osservazione:
 class FakeLinearPolicy:
     theta: np.ndarray
     gradient_value: float = 1.0
+    entropy_value: float = 0.7
+    entropy_gradient_value: float = 2.0
     applied_gradient: np.ndarray | None = None
     applied_learning_rate: float | None = None
     applied_max_update_norm: float | None = None
@@ -52,6 +54,12 @@ class FakeLinearPolicy:
         action: Carta,
     ) -> np.ndarray:
         return np.asarray([self.gradient_value], dtype=np.float32)
+
+    def entropy(self, osservazione: Osservazione) -> float:
+        return self.entropy_value
+
+    def grad_entropy(self, osservazione: Osservazione) -> np.ndarray:
+        return np.asarray([self.entropy_gradient_value], dtype=np.float32)
 
     def apply_gradient(
         self,
@@ -100,12 +108,13 @@ def episodio(
 
 class TestReinforceUpdate(unittest.TestCase):
     def test_config_default_e_valori_validi(self):
-        # Defaults declare the chosen baseline and disabled clipping.
+        # Defaults declare the chosen baseline and disabled optional regularizers.
         config = ReinforceConfig()
 
         self.assertEqual(config.learning_rate, 0.01)
         self.assertEqual(config.baseline, "time_dependent")
         self.assertIsNone(config.max_update_norm)
+        self.assertEqual(config.entropy_coef, 0.0)
         self.assertEqual(ReinforceConfig(baseline="none").baseline, "none")
         self.assertEqual(ReinforceConfig(baseline="batch_mean").baseline, "batch_mean")
 
@@ -119,6 +128,9 @@ class TestReinforceUpdate(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             ReinforceConfig(max_update_norm=-1.0)
+
+        with self.assertRaises(ValueError):
+            ReinforceConfig(entropy_coef=-0.1)
 
     def test_baseline_none_usa_zero(self):
         # Without a baseline, the gradient uses reward_to_go directly.
@@ -177,6 +189,24 @@ class TestReinforceUpdate(unittest.TestCase):
         self.assertEqual(policy.applied_learning_rate, 0.5)
         self.assertEqual(policy.applied_max_update_norm, 3.0)
         self.assertAlmostEqual(float(policy.theta[0]), 1.0)
+
+    def test_entropy_coef_aggiunge_gradiente_di_esplorazione(self):
+        # Entropy regularization adds an exploration gradient to the policy update.
+        policy = FakeLinearPolicy(theta=np.asarray([0.0], dtype=np.float32))
+
+        stats = reinforce_update(
+            policy,  # type: ignore[arg-type]
+            [episodio([0.0])],
+            ReinforceConfig(
+                learning_rate=1.0,
+                baseline="none",
+                entropy_coef=0.25,
+            ),
+        )
+
+        self.assertAlmostEqual(float(policy.applied_gradient[0]), 0.5)
+        self.assertAlmostEqual(float(policy.theta[0]), 0.5)
+        self.assertEqual(stats.mean_entropy, 0.7)
 
     def test_gradiente_normalizzato_per_episodi_non_per_step(self):
         # An episode with 10 decisions does not divide the accumulation by 10.

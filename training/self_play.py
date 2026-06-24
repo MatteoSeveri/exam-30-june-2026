@@ -6,13 +6,16 @@ import random
 from dataclasses import dataclass, field
 from typing import Literal
 
+import torch
+
 from game.rules import NUMERO_GIOCATORI, valida_giocatore_id
-from policy import LinearSoftmaxPolicy, Policy
+from policy import NeuralSoftmaxPolicy, Policy
 
 from .bootstrap import BootstrapPolicySchedule
 from .episode import EpisodeResult, collect_episode
+from .neural_reinforce import neural_reinforce_update
 from .pool import SnapshotPool
-from .reinforce import ReinforceConfig, TrainStats, reinforce_update
+from .reinforce import ReinforceConfig, TrainStats, TrainablePolicy, reinforce_update
 from .rewards import RewardConfig
 
 
@@ -70,15 +73,21 @@ class SelfPlayStats:
 class SelfPlayTrainer:
     """Orchestrate self-play batches, REINFORCE updates, and learner snapshots."""
 
-    learner: LinearSoftmaxPolicy
+    learner: TrainablePolicy | NeuralSoftmaxPolicy
     pool: SnapshotPool
     config: SelfPlayConfig = field(default_factory=SelfPlayConfig)
     seed: int = 0
     update_index: int = 0
     master_rng: random.Random = field(init=False)
+    neural_optimizer: torch.optim.Optimizer | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
         self.master_rng = random.Random(self.seed)
+        if isinstance(self.learner, NeuralSoftmaxPolicy):
+            self.neural_optimizer = torch.optim.Adam(
+                self.learner.parameters(),
+                lr=self.config.reinforce_config.learning_rate,
+            )
         if len(self.pool) == 0:
             self.pool.add_policy(
                 self.learner,
@@ -90,11 +99,24 @@ class SelfPlayTrainer:
         """Collect a balanced batch and update only the learner policy."""
 
         episodes = self._collect_training_batch()
-        train_stats = reinforce_update(
-            self.learner,
-            episodes,
-            self.config.reinforce_config,
-        )
+        if isinstance(self.learner, NeuralSoftmaxPolicy):
+            if self.neural_optimizer is None:
+                self.neural_optimizer = torch.optim.Adam(
+                    self.learner.parameters(),
+                    lr=self.config.reinforce_config.learning_rate,
+                )
+            train_stats = neural_reinforce_update(
+                self.learner,
+                episodes,
+                self.config.reinforce_config,
+                optimizer=self.neural_optimizer,
+            )
+        else:
+            train_stats = reinforce_update(
+                self.learner,
+                episodes,
+                self.config.reinforce_config,
+            )
 
         self.update_index += 1
         snapshot_added = False

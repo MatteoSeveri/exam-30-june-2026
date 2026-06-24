@@ -9,9 +9,11 @@ from .episode import (
 )
 from .bootstrap import BootstrapPolicySchedule
 from .pool import Snapshot, SnapshotPool
+from .neural_reinforce import neural_reinforce_update
 from .reinforce import (
     BASELINE_MODES,
     ReinforceConfig,
+    TrainablePolicy,
     TrainStats,
     reinforce_update,
 )
@@ -51,11 +53,13 @@ __all__ = [
     "SelfPlayStats",
     "SelfPlayTrainer",
     "TrajectoryStep",
+    "TrainablePolicy",
     "TrainStats",
     "calcola_margine",
     "calcola_segno",
     "collect_episode",
     "normalizza_margine",
+    "neural_reinforce_update",
     "reinforce_update",
     "reward_finale",
     "reward_presa",

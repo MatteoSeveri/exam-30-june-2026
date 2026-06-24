@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import random
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -119,6 +119,28 @@ class LinearSoftmaxPolicy:
 
         return (action_features - expected_features).astype(np.float32)
 
+    def entropy(self, osservazione: Osservazione) -> float:
+        """Return the entropy of the legal-action distribution."""
+
+        probabilities = self.action_probabilities(osservazione)
+        return entropy_from_probabilities(probabilities.values())
+
+    def grad_entropy(self, osservazione: Osservazione) -> np.ndarray:
+        """Return grad H(pi(. | observation)) for linear softmax."""
+
+        features_by_card = self._features_by_card(osservazione)
+        preferences = self._preferences_from_features(features_by_card)
+        probabilities = self._probabilities_from_preferences(preferences)
+        entropy = entropy_from_probabilities(probabilities.values())
+        gradient = np.zeros_like(self.theta, dtype=np.float32)
+
+        for carta, probability in probabilities.items():
+            log_probability = math.log(max(probability, 1e-15))
+            scale = np.float32(probability * (-log_probability - entropy))
+            gradient += scale * features_by_card[carta]
+
+        return gradient.astype(np.float32)
+
     def apply_gradient(
         self,
         gradient: Sequence[float] | np.ndarray,
@@ -208,6 +230,15 @@ def add_scaled_in_place(
 
 def vector_norm(vector: Sequence[float] | np.ndarray) -> float:
     return float(np.linalg.norm(np.asarray(vector, dtype=np.float32)))
+
+
+def entropy_from_probabilities(probabilities: Iterable[float]) -> float:
+    return float(
+        -sum(
+            probability * math.log(max(probability, 1e-15))
+            for probability in probabilities
+        )
+    )
 
 
 def clip_vector(vector: Sequence[float] | np.ndarray, max_norm: float) -> np.ndarray:

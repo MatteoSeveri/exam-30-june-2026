@@ -16,7 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
     # Allow `python scripts/train.py` without installing the project as a package.
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from policy import BriscolaFeatureExtractor, LinearSoftmaxPolicy
+from policy import BriscolaFeatureExtractor, LinearSoftmaxPolicy, NeuralSoftmaxPolicy
 from training import (
     BASELINE_MODES,
     BootstrapPolicySchedule,
@@ -31,11 +31,14 @@ from training import (
 )
 
 
+POLICY_TYPES = {"linear", "neural"}
+
+
 def parse_args() -> argparse.Namespace:
     """Read CLI parameters that configure the training loop."""
 
     parser = argparse.ArgumentParser(
-        description="Train a linear softmax Briscola policy with self-play.",
+        description="Train a softmax Briscola policy with self-play.",
     )
     parser.add_argument("--updates", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=40)
@@ -45,6 +48,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--drop-initial-pool", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--learner-giocatore-id", type=int, default=0)
+    parser.add_argument(
+        "--policy-type",
+        choices=sorted(POLICY_TYPES),
+        default="linear",
+    )
+    parser.add_argument("--hidden-size", type=int, default=64)
     parser.add_argument("--init-scale", type=float, default=0.01)
     parser.add_argument("--learning-rate", type=float, default=0.01)
     parser.add_argument(
@@ -53,6 +62,7 @@ def parse_args() -> argparse.Namespace:
         default="time_dependent",
     )
     parser.add_argument("--max-update-norm", type=float, default=None)
+    parser.add_argument("--entropy-coef", type=float, default=0.0)
     parser.add_argument(
         "--reward-mode",
         choices=sorted(REWARD_MODES),
@@ -81,6 +91,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("--updates deve essere positivo")
     if args.bootstrap_updates < 0:
         parser.error("--bootstrap-updates deve essere non negativo")
+    if args.hidden_size <= 0:
+        parser.error("--hidden-size deve essere positivo")
+    if args.entropy_coef < 0.0:
+        parser.error("--entropy-coef deve essere non negativo")
     return args
 
 
@@ -89,12 +103,7 @@ def main() -> None:
 
     # The extractor fixes the order and number of features used by theta.
     extractor = BriscolaFeatureExtractor()
-    learner = LinearSoftmaxPolicy.initialize(
-        feature_extractor=extractor,
-        rng=random.Random(args.seed),
-        scale=args.init_scale,
-        name="learner",
-    )
+    learner = initialize_learner(args, extractor)
     # The pool stores frozen learner copies used as opponents/partner.
     pool = SnapshotPool(
         feature_extractor=extractor,
@@ -111,6 +120,7 @@ def main() -> None:
         learning_rate=args.learning_rate,
         baseline=args.baseline,
         max_update_norm=args.max_update_norm,
+        entropy_coef=args.entropy_coef,
     )
     self_play_config = SelfPlayConfig(
         batch_size=args.batch_size,
@@ -141,11 +151,15 @@ def main() -> None:
             last_stats = trainer.train_update()
             record = stats_to_dict(last_stats)
             log_file.write(json.dumps(record) + "\n")
-            print(
+            message = (
                 "update={update_index} episodes={episodes} "
                 "mean_return={mean_return:.4f} margin={mean_score_margin:.2f} "
-                "grad_norm={gradient_norm:.4f} pool={pool_size}".format(**record)
+                "grad_norm={gradient_norm:.4f}"
             )
+            if record.get("mean_entropy") is not None:
+                message += " entropy={mean_entropy:.4f}"
+            message += " pool={pool_size}"
+            print(message.format(**record))
 
     # The checkpoint saves state and configuration; evaluation stays a separate step.
     checkpoint = checkpoint_to_dict(
@@ -165,7 +179,7 @@ def stats_to_dict(stats: SelfPlayStats) -> dict[str, Any]:
     """Convert update metrics into a readable JSONL row."""
 
     train_stats = stats.train_stats
-    return {
+    record = {
         "update_index": stats.update_index,
         "episodes": train_stats.episodes,
         "learner_decisions": train_stats.learner_decisions,
@@ -177,13 +191,73 @@ def stats_to_dict(stats: SelfPlayStats) -> dict[str, Any]:
         "pool_size": stats.pool_size,
         "snapshot_added": stats.snapshot_added,
     }
+    if train_stats.mean_entropy is not None:
+        record["mean_entropy"] = train_stats.mean_entropy
+    return record
+
+
+def initialize_learner(
+    args: argparse.Namespace,
+    extractor: BriscolaFeatureExtractor,
+) -> LinearSoftmaxPolicy | NeuralSoftmaxPolicy:
+    """Create the requested learner without changing the default linear path."""
+
+    if args.policy_type == "linear":
+        return LinearSoftmaxPolicy.initialize(
+            feature_extractor=extractor,
+            rng=random.Random(args.seed),
+            scale=args.init_scale,
+            name="learner",
+        )
+
+    if args.policy_type == "neural":
+        return NeuralSoftmaxPolicy.initialize(
+            feature_extractor=extractor,
+            rng=random.Random(args.seed),
+            hidden_size=args.hidden_size,
+            scale=args.init_scale,
+            name="learner",
+        )
+
+    raise ValueError(f"Policy type non supportata: {args.policy_type}")
+
+
+def learner_to_dict(
+    learner: LinearSoftmaxPolicy | NeuralSoftmaxPolicy,
+) -> dict[str, Any]:
+    """Serialize the learner in a checkpoint-friendly shape."""
+
+    payload: dict[str, Any] = {
+        "name": learner.name,
+        "theta": learner.theta.tolist(),
+    }
+    if isinstance(learner, NeuralSoftmaxPolicy):
+        payload["policy_type"] = "neural"
+        payload["hidden_size"] = learner.hidden_size
+    else:
+        payload["policy_type"] = "linear"
+    return payload
+
+
+def snapshot_to_dict(snapshot: Any) -> dict[str, Any]:
+    """Serialize one frozen pool snapshot."""
+
+    payload = {
+        "name": snapshot.name,
+        "update_index": snapshot.update_index,
+        "theta": snapshot.theta.tolist(),
+        "policy_type": snapshot.policy_type,
+    }
+    if snapshot.hidden_size is not None:
+        payload["hidden_size"] = snapshot.hidden_size
+    return payload
 
 
 def checkpoint_to_dict(
     *,
     args: argparse.Namespace,
     extractor: BriscolaFeatureExtractor,
-    learner: LinearSoftmaxPolicy,
+    learner: LinearSoftmaxPolicy | NeuralSoftmaxPolicy,
     pool: SnapshotPool,
     trainer: SelfPlayTrainer,
     last_stats: SelfPlayStats | None,
@@ -195,18 +269,8 @@ def checkpoint_to_dict(
         "update_index": trainer.update_index,
         "seed": args.seed,
         "feature_names": list(extractor.feature_names),
-        "learner": {
-            "name": learner.name,
-            "theta": learner.theta.tolist(),
-        },
-        "pool": [
-            {
-                "name": snapshot.name,
-                "update_index": snapshot.update_index,
-                "theta": snapshot.theta.tolist(),
-            }
-            for snapshot in pool.snapshots
-        ],
+        "learner": learner_to_dict(learner),
+        "pool": [snapshot_to_dict(snapshot) for snapshot in pool.snapshots],
         "config": {
             "updates": args.updates,
             "batch_size": args.batch_size,
@@ -215,10 +279,13 @@ def checkpoint_to_dict(
             "bootstrap_updates": args.bootstrap_updates,
             "keep_initial_pool": not args.drop_initial_pool,
             "learner_giocatore_id": args.learner_giocatore_id,
+            "policy_type": args.policy_type,
+            "hidden_size": args.hidden_size,
             "init_scale": args.init_scale,
             "learning_rate": args.learning_rate,
             "baseline": args.baseline,
             "max_update_norm": args.max_update_norm,
+            "entropy_coef": args.entropy_coef,
             "reward_mode": args.reward_mode,
             "reward_alpha": args.reward_alpha,
             "reward_lambda_margin": args.reward_lambda_margin,

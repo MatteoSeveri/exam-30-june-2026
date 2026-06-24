@@ -22,7 +22,7 @@ from evaluation import (
     evaluate_suite,
     make_evaluation_cases,
 )
-from policy import BriscolaFeatureExtractor, LinearSoftmaxPolicy
+from policy import BriscolaFeatureExtractor, LinearSoftmaxPolicy, NeuralSoftmaxPolicy
 
 
 def parse_args() -> argparse.Namespace:
@@ -94,7 +94,9 @@ def load_checkpoint(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def learner_from_checkpoint(checkpoint: dict[str, Any]) -> LinearSoftmaxPolicy:
+def learner_from_checkpoint(
+    checkpoint: dict[str, Any],
+) -> LinearSoftmaxPolicy | NeuralSoftmaxPolicy:
     """Rebuild the final learner saved in the checkpoint."""
 
     extractor = BriscolaFeatureExtractor()
@@ -103,6 +105,25 @@ def learner_from_checkpoint(checkpoint: dict[str, Any]) -> LinearSoftmaxPolicy:
         raise ValueError("Le feature del checkpoint non corrispondono all'estrattore")
 
     learner = checkpoint.get("learner", {})
+    policy_type = learner.get("policy_type") or checkpoint.get("config", {}).get(
+        "policy_type",
+        "linear",
+    )
+    if policy_type == "neural":
+        hidden_size = learner.get("hidden_size") or checkpoint.get("config", {}).get(
+            "hidden_size"
+        )
+        if hidden_size is None:
+            raise ValueError("Checkpoint neurale senza hidden_size")
+        return NeuralSoftmaxPolicy(
+            theta=learner["theta"],
+            feature_extractor=extractor,
+            hidden_size=int(hidden_size),
+            name=learner.get("name", "learner"),
+        )
+    if policy_type != "linear":
+        raise ValueError(f"Policy type non supportata: {policy_type}")
+
     return LinearSoftmaxPolicy(
         theta=learner["theta"],
         feature_extractor=extractor,

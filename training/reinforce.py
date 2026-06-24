@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from statistics import mean
-from typing import Literal
+from typing import Literal, Protocol
 
 import numpy as np
 
+from game.cards import Carta
+from game.observation import Osservazione
 from game.rules import squadra_avversaria_di
-from policy import LinearSoftmaxPolicy
 from policy.linear_softmax_policy import add_scaled_in_place, vector_norm
 
 from .episode import EpisodeResult, TrajectoryStep
@@ -17,6 +19,51 @@ from .episode import EpisodeResult, TrajectoryStep
 
 BaselineMode = Literal["none", "batch_mean", "time_dependent"]
 BASELINE_MODES = {"none", "batch_mean", "time_dependent"}
+
+
+class TrainablePolicy(Protocol):
+    """Policy interface required by the REINFORCE update."""
+
+    name: str
+    theta: np.ndarray
+
+    def action_probabilities(self, osservazione: Osservazione) -> dict[Carta, float]:
+        """Return a probability for each legal action."""
+        ...
+
+    def select_action(
+        self,
+        osservazione: Osservazione,
+        rng: random.Random,
+        greedy: bool = False,
+    ) -> Carta:
+        """Select one legal action from the observation."""
+        ...
+
+    def grad_log_probability(
+        self,
+        osservazione: Osservazione,
+        action: Carta,
+    ) -> np.ndarray:
+        """Return grad log pi(action | observation)."""
+        ...
+
+    def apply_gradient(
+        self,
+        gradient: np.ndarray,
+        learning_rate: float,
+        max_update_norm: float | None = None,
+    ) -> None:
+        """Apply one policy-gradient update."""
+        ...
+
+    def entropy(self, osservazione: Osservazione) -> float:
+        """Return the entropy of the legal-action distribution."""
+        ...
+
+    def grad_entropy(self, osservazione: Osservazione) -> np.ndarray:
+        """Return grad H(pi(. | observation))."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -27,6 +74,7 @@ class ReinforceConfig:
     baseline: BaselineMode = "time_dependent"
     # Default None: clipping is a hyperparameter, not part of the initial protocol.
     max_update_norm: float | None = None
+    entropy_coef: float = 0.0
 
     def __post_init__(self) -> None:
         if self.learning_rate < 0.0:
@@ -35,6 +83,8 @@ class ReinforceConfig:
             raise ValueError(f"Baseline non supportata: {self.baseline}")
         if self.max_update_norm is not None and self.max_update_norm < 0.0:
             raise ValueError("max_update_norm deve essere non negativo o None")
+        if self.entropy_coef < 0.0:
+            raise ValueError("entropy_coef deve essere non negativo")
 
 
 @dataclass(frozen=True)
@@ -48,10 +98,11 @@ class TrainStats:
     gradient_norm: float
     baseline: BaselineMode
     baseline_values: tuple[float, ...]
+    mean_entropy: float | None = None
 
 
 def reinforce_update(
-    policy: LinearSoftmaxPolicy,
+    policy: TrainablePolicy,
     episodes: list[EpisodeResult],
     config: ReinforceConfig = ReinforceConfig(),
 ) -> TrainStats:
@@ -66,6 +117,7 @@ def reinforce_update(
 
     baseline_values = _baseline_values(episodes, config.baseline)
     gradient = np.zeros_like(policy.theta, dtype=np.float32)
+    entropies: list[float] = []
 
     for episode in episodes:
         for decision_index, step in enumerate(episode.steps):
@@ -84,6 +136,13 @@ def reinforce_update(
                 grad_log_probability,
                 advantage / len(episodes),
             )
+            if config.entropy_coef > 0.0:
+                entropies.append(policy.entropy(step.osservazione))
+                add_scaled_in_place(
+                    gradient,
+                    policy.grad_entropy(step.osservazione),
+                    config.entropy_coef / len(episodes),
+                )
 
     gradient_norm = vector_norm(gradient)
     policy.apply_gradient(
@@ -100,6 +159,7 @@ def reinforce_update(
         gradient_norm=gradient_norm,
         baseline=config.baseline,
         baseline_values=baseline_values,
+        mean_entropy=float(mean(entropies)) if entropies else None,
     )
 
 

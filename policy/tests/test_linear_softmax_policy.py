@@ -136,6 +136,31 @@ class TestLinearSoftmaxPolicy(unittest.TestCase):
         self.assertEqual(len(gradient), len(policy.theta))
         self.assertAlmostEqual(gradient[0], 0.5)
 
+    def test_entropy_e_gradiente_entropy_sono_coerenti(self):
+        # Entropy regularization uses the closed-form gradient of the softmax entropy.
+        asso = Carta("coppe", "asso")
+        due = Carta("bastoni", "due")
+        obs = osservazione(mano=(asso, due))
+        extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
+        policy = LinearSoftmaxPolicy(theta=[2.0], feature_extractor=extractor)
+        epsilon = 1e-3
+
+        entropy = policy.entropy(obs)
+        gradient = policy.grad_entropy(obs)
+        entropy_plus = LinearSoftmaxPolicy(
+            theta=[2.0 + epsilon],
+            feature_extractor=extractor,
+        ).entropy(obs)
+        entropy_minus = LinearSoftmaxPolicy(
+            theta=[2.0 - epsilon],
+            feature_extractor=extractor,
+        ).entropy(obs)
+        finite_difference = (entropy_plus - entropy_minus) / (2 * epsilon)
+
+        self.assertGreater(entropy, 0.0)
+        self.assertEqual(gradient.shape, policy.theta.shape)
+        self.assertAlmostEqual(gradient[0], finite_difference, places=3)
+
     def test_action_non_legale_solleva_value_error_per_log_e_gradiente(self):
         # Log probability and gradient are defined only for legal actions.
         obs = osservazione()

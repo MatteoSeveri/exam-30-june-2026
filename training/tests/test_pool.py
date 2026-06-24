@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from policy import BriscolaFeatureExtractor, LinearSoftmaxPolicy
+from policy import BriscolaFeatureExtractor, LinearSoftmaxPolicy, NeuralSoftmaxPolicy
 from training.pool import SnapshotPool
 
 
@@ -52,6 +52,26 @@ class TestSnapshotPool(unittest.TestCase):
         self.assertTrue(
             np.allclose(sampled.theta, np.asarray([7.0], dtype=np.float32))
         )
+
+    def test_sample_policy_preserva_snapshot_neurale(self):
+        # Neural learners must keep their architecture when sampled from the pool.
+        extractor = BriscolaFeatureExtractor(feature_names=["carta_asso"])
+        policy = NeuralSoftmaxPolicy.initialize(
+            extractor,
+            rng=random.Random(0),
+            hidden_size=3,
+            name="learner",
+        )
+        pool = SnapshotPool(feature_extractor=extractor)
+
+        pool.add_policy(policy, name="snapshot_1", update_index=1)
+        sampled = pool.sample_policy(random.Random(0))
+
+        self.assertIsInstance(sampled, NeuralSoftmaxPolicy)
+        self.assertEqual(sampled.hidden_size, 3)
+        self.assertEqual(sampled.name, "snapshot_1")
+        self.assertIs(sampled.feature_extractor, extractor)
+        self.assertFalse(np.shares_memory(policy.theta, sampled.theta))
 
     def test_due_sample_dallo_stesso_snapshot_non_condividono_theta(self):
         # Two players drawing the same snapshot must not share memory.
