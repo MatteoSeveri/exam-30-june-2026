@@ -1,0 +1,1184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Briscola Visual Diagnostics</title>
+  <style>
+    :root {
+      --wood: #7b4f2c;
+      --wood-dark: #4a2d18;
+      --felt: #107044;
+      --felt-dark: #0b5535;
+      --gold: #f6b61d;
+      --gold-dark: #a76500;
+      --ink: #23160d;
+      --muted: rgba(255, 255, 255, 0.78);
+      --card: #fffdf7;
+      --red: #ba251b;
+      --black: #1d2939;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      color: white;
+      background: var(--felt-dark);
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .topbar {
+      height: 64px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.14), rgba(0,0,0,0.18)),
+        repeating-linear-gradient(90deg, #805632 0 80px, #74492a 80px 160px);
+      border-bottom: 4px solid var(--wood-dark);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 16px;
+      align-items: center;
+      padding: 0 22px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+      position: relative;
+      z-index: 10;
+    }
+
+    .brand {
+      font-weight: 900;
+      font-size: 25px;
+      letter-spacing: 0;
+      text-shadow: 0 2px 2px rgba(0,0,0,0.35);
+      white-space: nowrap;
+    }
+
+    .status {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+      min-width: 0;
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .pill {
+      min-width: 92px;
+      height: 42px;
+      padding: 0 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 2px solid var(--gold-dark);
+      border-radius: 14px;
+      background: linear-gradient(#ffd34d, #ee9709);
+      box-shadow: inset 0 2px rgba(255,255,255,0.45), 0 2px 4px rgba(0,0,0,0.35);
+      white-space: nowrap;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .file-button {
+      cursor: pointer;
+    }
+
+    .file-button input {
+      display: none;
+    }
+
+    .round-button {
+      width: 42px;
+      min-width: 42px;
+      padding: 0;
+      border-radius: 14px;
+      border: 2px solid var(--gold-dark);
+      background: linear-gradient(#ffd34d, #ee9709);
+      color: var(--ink);
+      font-weight: 900;
+      box-shadow: inset 0 2px rgba(255,255,255,0.45), 0 2px 4px rgba(0,0,0,0.35);
+      cursor: pointer;
+    }
+
+    .round-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .table {
+      height: calc(100vh - 64px);
+      position: relative;
+      background:
+        radial-gradient(circle at 50% 35%, rgba(255,255,255,0.09), transparent 36%),
+        radial-gradient(circle at 20% 80%, rgba(255,255,255,0.05), transparent 25%),
+        linear-gradient(135deg, rgba(255,255,255,0.04), rgba(0,0,0,0.14)),
+        var(--felt);
+      box-shadow: inset 0 0 120px rgba(0,0,0,0.28);
+      overflow: hidden;
+    }
+
+    .nav-arrow {
+      position: absolute;
+      top: 47%;
+      transform: translateY(-50%);
+      width: 54px;
+      height: 70px;
+      border: 0;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.22);
+      color: white;
+      font-size: 42px;
+      line-height: 1;
+      cursor: pointer;
+      z-index: 5;
+    }
+
+    .nav-arrow:hover {
+      background: rgba(0,0,0,0.32);
+    }
+
+    .nav-arrow:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+    }
+
+    .prev {
+      left: 18px;
+    }
+
+    .next {
+      right: 18px;
+    }
+
+    .deck-area {
+      position: absolute;
+      left: 11%;
+      top: 33%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .deck {
+      width: 58px;
+      height: 86px;
+      border-radius: 7px;
+      border: 3px solid white;
+      background:
+        repeating-linear-gradient(45deg, #0879bd 0 4px, #0693d1 4px 8px);
+      box-shadow: 4px 5px 0 rgba(0,0,0,0.32);
+      display: grid;
+      place-items: center;
+      color: white;
+      font-weight: 900;
+      text-shadow: 0 1px 1px rgba(0,0,0,0.45);
+    }
+
+    .briscola-card {
+      transform: rotate(85deg);
+      margin-left: -2px;
+    }
+
+    .capture-piles {
+      position: absolute;
+      right: 7%;
+      top: 31%;
+      display: grid;
+      gap: 16px;
+      z-index: 2;
+    }
+
+    .capture-pile {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: center;
+      color: white;
+      text-shadow: 0 2px 2px rgba(0,0,0,0.38);
+      font-weight: 900;
+    }
+
+    .pile-stack {
+      position: relative;
+      width: 62px;
+      height: 44px;
+    }
+
+    .pile-card {
+      position: absolute;
+      width: 44px;
+      height: 32px;
+      border-radius: 5px;
+      border: 2px solid white;
+      background:
+        repeating-linear-gradient(45deg, #0a75b7 0 4px, #1092d0 4px 8px);
+      box-shadow: 2px 3px 0 rgba(0,0,0,0.28);
+    }
+
+    .pile-card:nth-child(1) {
+      left: 0;
+      top: 7px;
+      transform: rotate(-8deg);
+    }
+
+    .pile-card:nth-child(2) {
+      left: 9px;
+      top: 3px;
+      transform: rotate(4deg);
+    }
+
+    .pile-card:nth-child(3) {
+      left: 18px;
+      top: 9px;
+      transform: rotate(12deg);
+    }
+
+    .pile-label {
+      display: grid;
+      gap: 2px;
+      font-size: 13px;
+    }
+
+    .pile-count {
+      color: var(--gold);
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .player-score {
+      position: absolute;
+      min-width: 82px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background: linear-gradient(#8d5a25, #573116);
+      border: 2px solid rgba(255, 211, 77, 0.75);
+      font-size: 28px;
+      font-weight: 900;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.32);
+    }
+
+    .top-score {
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .bottom-score {
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .turn-badge {
+      position: absolute;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.92);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 900;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+      white-space: nowrap;
+    }
+
+    .turn-top {
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .turn-bottom {
+      bottom: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .turn-left {
+      top: 50%;
+      left: 28px;
+      transform: translateY(-50%);
+    }
+
+    .turn-right {
+      top: 50%;
+      right: 28px;
+      transform: translateY(-50%);
+    }
+
+    .center {
+      position: absolute;
+      inset: 92px 150px 154px;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+    }
+
+    .trick {
+      position: relative;
+      width: min(440px, 58vw);
+      height: min(310px, 42vh);
+    }
+
+    .trick-message {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 220px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(255, 211, 77, 0.96);
+      color: var(--ink);
+      text-align: center;
+      font-size: 15px;
+      font-weight: 950;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.32);
+      z-index: 2;
+    }
+
+    .played {
+      position: absolute;
+      display: grid;
+      gap: 4px;
+      justify-items: center;
+    }
+
+    .played-label {
+      color: white;
+      background: rgba(0,0,0,0.35);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .played.p0 {
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+    }
+
+    .played.p1 {
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .played.p2 {
+      left: 50%;
+      top: 0;
+      transform: translateX(-50%);
+    }
+
+    .played.p3 {
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .learner-hand {
+      position: absolute;
+      left: 50%;
+      bottom: 112px;
+      transform: translateX(-50%);
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 10px;
+      min-height: 120px;
+      max-width: min(92vw, 540px);
+      z-index: 3;
+    }
+
+    .card-wrap {
+      position: relative;
+      display: grid;
+      justify-items: center;
+      gap: 0;
+    }
+
+    .prob {
+      min-width: 38px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.95);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 900;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+      transform: translateY(-10px);
+      margin-bottom: 2px;
+    }
+
+    .prob.empty {
+      visibility: hidden;
+    }
+
+    .card {
+      width: 72px;
+      height: 104px;
+      border-radius: 7px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.96), rgba(255,246,224,0.96)),
+        var(--card);
+      border: 2px solid #d8d0c2;
+      color: var(--ink);
+      box-shadow: 0 4px 7px rgba(0,0,0,0.32);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 5px;
+      user-select: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card.small {
+      width: 62px;
+      height: 90px;
+    }
+
+    .card.chosen {
+      outline: 4px solid var(--gold);
+      outline-offset: 3px;
+      transform: translateY(-8px);
+    }
+
+    .card.briscola {
+      box-shadow: 0 0 0 3px rgba(246, 182, 29, 0.85), 0 4px 7px rgba(0,0,0,0.32);
+    }
+
+    .card.played-now {
+      animation: deal-in 260ms ease-out;
+    }
+
+    @keyframes deal-in {
+      from {
+        opacity: 0.25;
+        transform: translateY(28px) scale(0.92);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .corner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 950;
+      line-height: 1;
+      position: relative;
+      z-index: 2;
+    }
+
+    .corner.bottom {
+      transform: rotate(180deg);
+    }
+
+    .art {
+      align-self: stretch;
+      display: grid;
+      place-items: center;
+      position: relative;
+      margin: 2px 0;
+      border-radius: 5px;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(255,255,255,0.9), transparent 35%),
+        linear-gradient(135deg, rgba(0,0,0,0.04), rgba(255,255,255,0.18));
+      overflow: hidden;
+    }
+
+    .pip {
+      display: grid;
+      place-items: center;
+      font-weight: 950;
+      line-height: 1;
+    }
+
+    .pip-grid {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-auto-rows: 1fr;
+      align-items: center;
+      justify-items: center;
+      gap: 1px;
+      padding: 2px;
+      font-size: 15px;
+      line-height: 1;
+    }
+
+    .card.small .pip-grid {
+      font-size: 13px;
+      gap: 0;
+      padding: 1px;
+    }
+
+    .court-art {
+      width: 46px;
+      height: 50px;
+      border: 3px solid currentColor;
+      border-radius: 10px;
+      background:
+        linear-gradient(180deg, rgba(255,211,77,0.65), rgba(255,255,255,0.3)),
+        repeating-linear-gradient(45deg, transparent 0 7px, rgba(0,0,0,0.08) 7px 10px);
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 950;
+      text-align: center;
+      line-height: 1.05;
+    }
+
+    .card.small .court-art {
+      width: 34px;
+      height: 38px;
+      font-size: 18px;
+      border-width: 2px;
+    }
+
+    .ace-art {
+      width: 42px;
+      height: 50px;
+      display: grid;
+      place-items: center;
+      font-size: 29px;
+      font-weight: 950;
+      border-radius: 12px;
+      border: 3px double currentColor;
+      background: rgba(255,255,255,0.7);
+    }
+
+    .card.small .ace-art {
+      width: 34px;
+      height: 40px;
+      font-size: 24px;
+      border-width: 2px;
+    }
+
+    .red {
+      color: var(--red);
+    }
+
+    .black {
+      color: var(--black);
+    }
+
+    .footer {
+      position: absolute;
+      left: 20px;
+      right: auto;
+      bottom: 18px;
+      display: grid;
+      grid-template-columns: 340px;
+      align-items: start;
+      justify-items: start;
+      gap: 5px;
+      color: white;
+      text-shadow: 0 2px 2px rgba(0,0,0,0.4);
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .footer-left {
+      font-size: 12px;
+      font-weight: 850;
+      max-width: 340px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .opponent-policies {
+      font-size: 12px;
+      font-weight: 850;
+      max-width: 340px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+    }
+
+    .footer-center {
+      display: grid;
+      gap: 4px;
+      justify-items: start;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .step-range {
+      width: 320px;
+      pointer-events: auto;
+    }
+
+    .footer-right {
+      text-align: left;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .empty {
+      color: rgba(255,255,255,0.75);
+      font-size: 14px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        overflow: auto;
+      }
+
+      .topbar {
+        height: auto;
+        min-height: 64px;
+        grid-template-columns: 1fr;
+        padding: 10px 12px;
+      }
+
+      .status,
+      .actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .table {
+        min-height: 760px;
+        height: calc(100vh - 112px);
+      }
+
+      .center {
+        inset: 150px 56px 230px;
+      }
+
+      .deck-area {
+        left: 20px;
+        top: 145px;
+      }
+
+      .capture-piles {
+        right: 16px;
+        top: 145px;
+        gap: 8px;
+      }
+
+      .learner-hand {
+        bottom: 164px;
+        flex-wrap: wrap;
+      }
+
+      .card {
+        width: 64px;
+        height: 94px;
+      }
+
+      .footer {
+        grid-template-columns: 1fr;
+        justify-items: start;
+        bottom: 16px;
+        left: 14px;
+        right: 14px;
+      }
+
+      .footer-left,
+      .footer-right {
+        text-align: left;
+      }
+
+      .step-range {
+        width: calc(100vw - 28px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Briscola RL</div>
+    <div class="status">
+      <div class="pill" id="turnPill">Load JSON</div>
+      <div class="pill" id="scorePill">0 - 0</div>
+      <button class="round-button" id="prevTop" title="Previous decision">&larr;</button>
+      <button class="round-button" id="nextTop" title="Next decision">&rarr;</button>
+    </div>
+    <div class="actions">
+      <label class="pill file-button">
+        Load
+        <input id="fileInput" type="file" accept="application/json,.json">
+      </label>
+    </div>
+  </header>
+
+  <main class="table">
+    <button class="nav-arrow prev" id="prevSide" title="Previous decision">&lsaquo;</button>
+    <button class="nav-arrow next" id="nextSide" title="Next decision">&rsaquo;</button>
+
+    <div class="player-score top-score" id="topScore">0</div>
+    <div class="player-score bottom-score" id="bottomScore">0</div>
+    <div class="turn-badge turn-top" id="badge2">P2 partner</div>
+    <div class="turn-badge turn-left" id="badge1">P1 opponent</div>
+    <div class="turn-badge turn-right" id="badge3">P3 opponent</div>
+    <div class="turn-badge turn-bottom" id="badge0">P0 learner</div>
+
+    <div class="deck-area">
+      <div class="deck" id="deckCount">-</div>
+      <div id="briscolaCard"></div>
+    </div>
+
+    <div class="capture-piles">
+      <div class="capture-pile">
+        <div class="pile-stack" id="pariPile"></div>
+        <div class="pile-label">
+          <span>pari</span>
+          <span class="pile-count" id="pariPileCount">0</span>
+        </div>
+      </div>
+      <div class="capture-pile">
+        <div class="pile-stack" id="dispariPile"></div>
+        <div class="pile-label">
+          <span>dispari</span>
+          <span class="pile-count" id="dispariPileCount">0</span>
+        </div>
+      </div>
+    </div>
+
+    <section class="center">
+      <div class="trick" id="trick"></div>
+    </section>
+
+    <section class="learner-hand" id="learnerHand">
+      <div class="empty">Load a diagnostics JSON.</div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-left" id="metaText">No file loaded</div>
+      <div class="opponent-policies" id="policyLine">Partner: - | Opponents: -</div>
+      <div class="footer-center">
+        <input class="step-range" id="stepRange" type="range" min="0" max="0" value="0" disabled>
+        <span id="stepText">Step -</span>
+      </div>
+      <div class="footer-right" id="finalText">Final points: -</div>
+    </footer>
+  </main>
+
+  <script>
+    const state = {
+      report: null,
+      records: [],
+      index: 0,
+      ourPlayer: 0,
+      learnerHands: [],
+      fileName: "",
+    };
+
+    const els = {
+      fileInput: document.getElementById("fileInput"),
+      turnPill: document.getElementById("turnPill"),
+      scorePill: document.getElementById("scorePill"),
+      prevTop: document.getElementById("prevTop"),
+      nextTop: document.getElementById("nextTop"),
+      prevSide: document.getElementById("prevSide"),
+      nextSide: document.getElementById("nextSide"),
+      topScore: document.getElementById("topScore"),
+      bottomScore: document.getElementById("bottomScore"),
+      badges: [
+        document.getElementById("badge0"),
+        document.getElementById("badge1"),
+        document.getElementById("badge2"),
+        document.getElementById("badge3"),
+      ],
+      deckCount: document.getElementById("deckCount"),
+      briscolaCard: document.getElementById("briscolaCard"),
+      pariPile: document.getElementById("pariPile"),
+      dispariPile: document.getElementById("dispariPile"),
+      pariPileCount: document.getElementById("pariPileCount"),
+      dispariPileCount: document.getElementById("dispariPileCount"),
+      trick: document.getElementById("trick"),
+      learnerHand: document.getElementById("learnerHand"),
+      metaText: document.getElementById("metaText"),
+      policyLine: document.getElementById("policyLine"),
+      stepRange: document.getElementById("stepRange"),
+      stepText: document.getElementById("stepText"),
+      finalText: document.getElementById("finalText"),
+    };
+
+    els.fileInput.addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      loadReport(JSON.parse(await file.text()), file.name);
+    });
+
+    for (const button of [els.prevTop, els.prevSide]) {
+      button.addEventListener("click", () => move(-1));
+    }
+    for (const button of [els.nextTop, els.nextSide]) {
+      button.addEventListener("click", () => move(1));
+    }
+    els.stepRange.addEventListener("input", () => {
+      state.index = Number(els.stepRange.value);
+      render();
+    });
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") move(-1);
+      if (event.key === "ArrowRight") move(1);
+    });
+    window.addEventListener("DOMContentLoaded", () => {
+      const jsonPath = new URLSearchParams(window.location.search).get("json");
+      if (jsonPath) loadReportFromUrl(jsonPath);
+      else render();
+    });
+
+    async function loadReportFromUrl(jsonPath) {
+      try {
+        const response = await fetch(jsonPath);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        loadReport(await response.json(), jsonPath.split("/").pop() || jsonPath);
+      } catch (error) {
+        els.metaText.textContent = `Could not load ${jsonPath}: ${error.message}`;
+      }
+    }
+
+    function loadReport(report, fileName) {
+      if (!report.decision_log || !Array.isArray(report.decision_log.records)) {
+        throw new Error("Invalid diagnostics file");
+      }
+      state.report = report;
+      state.records = report.decision_log.records;
+      state.index = 0;
+      state.ourPlayer = report.learner_giocatore_id ?? 0;
+      state.fileName = fileName;
+      state.learnerHands = buildLearnerHands(state.records, state.ourPlayer);
+      els.stepRange.max = Math.max(0, state.records.length - 1);
+      els.stepRange.disabled = state.records.length === 0;
+      render();
+    }
+
+    function buildLearnerHands(records, ourPlayer) {
+      const hands = [];
+      let lastKnown = [];
+      for (const record of records) {
+        if (Array.isArray(record.focus_mano) && record.focus_giocatore_id === ourPlayer) {
+          hands[record.step_index] = cloneCards(record.focus_mano);
+          continue;
+        }
+        if (record.giocatore_id === ourPlayer) {
+          lastKnown = cloneCards(record.mano);
+          hands[record.step_index] = cloneCards(lastKnown);
+          lastKnown = lastKnown.filter((card) => card.id !== record.azione.id);
+        } else {
+          hands[record.step_index] = cloneCards(lastKnown);
+        }
+      }
+      return hands;
+    }
+
+    function cloneCards(cards) {
+      return cards.map((card) => ({ ...card }));
+    }
+
+    function move(delta) {
+      if (!state.records.length) return;
+      state.index = Math.min(state.records.length - 1, Math.max(0, state.index + delta));
+      render();
+    }
+
+    function render() {
+      const loaded = state.records.length > 0;
+      setNavigationEnabled(loaded);
+      if (!loaded) {
+        renderEmpty();
+        return;
+      }
+
+      const record = state.records[state.index];
+      const log = state.report.decision_log;
+      const obs = record.osservazione;
+      const owner = ownerLabel(record.giocatore_id, state.ourPlayer);
+      const ourTeam = state.ourPlayer % 2 === 0 ? "pari" : "dispari";
+      const opponentTeam = ourTeam === "pari" ? "dispari" : "pari";
+      const finalScore = log.punteggi_finali;
+
+      els.stepRange.value = String(state.index);
+      els.turnPill.textContent = owner === "OUR TURN" ? "YOUR TURN" : owner.toUpperCase();
+      els.scorePill.textContent = `${obs.punteggio_squadra} - ${obs.punteggio_avversari}`;
+      els.topScore.textContent = obs.punteggio_avversari;
+      els.bottomScore.textContent = obs.punteggio_squadra;
+      els.deckCount.textContent = obs.carte_nel_mazzo;
+      els.briscolaCard.innerHTML = "";
+      els.briscolaCard.appendChild(cardElement(record.briscola_esposta, { small: true, briscola: true }));
+      els.metaText.textContent = `${state.fileName} | learner P${state.ourPlayer} | ${record.seme_briscola} briscola`;
+      els.policyLine.textContent = policyLineText();
+      els.stepText.textContent = `Step ${state.index + 1}/${state.records.length} | trick ${obs.indice_presa} card ${obs.posizione_nella_presa + 1}/4 | P${record.giocatore_id}`;
+      els.finalText.textContent = `Final points: ${ourTeam}=${finalScore[ourTeam]}, ${opponentTeam}=${finalScore[opponentTeam]} | winner=${log.squadra_vincitrice}`;
+
+      renderBadges(record);
+      renderCapturePiles();
+      renderTrick(record);
+      renderLearnerHand(record);
+    }
+
+    function renderEmpty() {
+      els.turnPill.textContent = "Load JSON";
+      els.scorePill.textContent = "0 - 0";
+      els.topScore.textContent = "0";
+      els.bottomScore.textContent = "0";
+      els.deckCount.textContent = "-";
+      els.briscolaCard.innerHTML = "";
+      els.pariPile.innerHTML = "";
+      els.dispariPile.innerHTML = "";
+      els.pariPileCount.textContent = "0";
+      els.dispariPileCount.textContent = "0";
+      els.trick.innerHTML = "";
+      els.learnerHand.innerHTML = '<div class="empty">Load a diagnostics JSON.</div>';
+      els.metaText.textContent = "No file loaded";
+      els.policyLine.textContent = "Partner: - | Opponents: -";
+      els.stepText.textContent = "Step -";
+      els.finalText.textContent = "Final points: -";
+      for (let player = 0; player < 4; player += 1) {
+        els.badges[player].textContent = `P${player}`;
+        els.badges[player].style.background = "rgba(255,255,255,0.92)";
+      }
+    }
+
+    function setNavigationEnabled(enabled) {
+      for (const button of [els.prevTop, els.nextTop, els.prevSide, els.nextSide]) {
+        button.disabled = !enabled;
+      }
+    }
+
+    function renderBadges(record) {
+      for (let player = 0; player < 4; player += 1) {
+        const badge = els.badges[player];
+        const active = player === record.giocatore_id;
+        badge.textContent = `P${player} ${roleLabel(player, state.ourPlayer)}`;
+        badge.style.background = active ? "#ffd34d" : "rgba(255,255,255,0.92)";
+        badge.style.color = "#23160d";
+      }
+    }
+
+    function renderTrick(record) {
+      const visibleCards = [
+        ...record.carte_sul_campo,
+        {
+          giocatore_id: record.giocatore_id,
+          carta: record.azione,
+        },
+      ];
+      const playedByPlayer = new Map(visibleCards.map((played) => [played.giocatore_id, played]));
+      els.trick.innerHTML = "";
+      for (let player = 0; player < 4; player += 1) {
+        const slot = document.createElement("div");
+        slot.className = `played p${player}`;
+        const label = document.createElement("div");
+        label.className = "played-label";
+        label.textContent = `P${player}`;
+        slot.appendChild(label);
+        const played = playedByPlayer.get(player);
+        if (played) {
+          slot.appendChild(cardElement(played.carta, {
+            small: true,
+            briscola: played.carta.seme === record.seme_briscola,
+            playedNow: played.giocatore_id === record.giocatore_id,
+          }));
+        }
+        els.trick.appendChild(slot);
+      }
+      if (record.outcome.presa_completata) {
+        const message = document.createElement("div");
+        message.className = "trick-message";
+        message.textContent = `P${record.outcome.vincitore_presa} wins trick (${record.outcome.punti_presa} pts)`;
+        els.trick.appendChild(message);
+      }
+    }
+
+    function renderCapturePiles() {
+      const counts = { pari: 0, dispari: 0 };
+      for (let index = 0; index <= state.index; index += 1) {
+        const outcome = state.records[index].outcome;
+        if (!outcome.presa_completata || outcome.vincitore_presa == null) continue;
+        const team = outcome.vincitore_presa % 2 === 0 ? "pari" : "dispari";
+        counts[team] += 1;
+      }
+
+      renderPile(els.pariPile, counts.pari);
+      renderPile(els.dispariPile, counts.dispari);
+      els.pariPileCount.textContent = `${counts.pari} prese`;
+      els.dispariPileCount.textContent = `${counts.dispari} prese`;
+    }
+
+    function renderPile(container, count) {
+      container.innerHTML = "";
+      const visibleCards = Math.min(3, count);
+      for (let i = 0; i < visibleCards; i += 1) {
+        const card = document.createElement("div");
+        card.className = "pile-card";
+        container.appendChild(card);
+      }
+    }
+
+    function policyLineText() {
+      const partner = (state.ourPlayer + 2) % 4;
+      const partnerRecord = state.records.find((item) => item.giocatore_id === partner);
+      const opponents = [];
+      for (let player = 0; player < 4; player += 1) {
+        if (player === state.ourPlayer || player % 2 === state.ourPlayer % 2) continue;
+        const record = state.records.find((item) => item.giocatore_id === player);
+        opponents.push(`P${player}: ${record ? record.policy_name : "unknown"}`);
+      }
+      return `Partner: P${partner}: ${partnerRecord ? partnerRecord.policy_name : "unknown"} | Opponents: ${opponents.join(" | ")}`;
+    }
+
+    function renderLearnerHand(record) {
+      const isOurs = record.giocatore_id === state.ourPlayer;
+      const cards = state.learnerHands[record.step_index] || [];
+      const probabilities = isOurs ? record.action_probabilities : {};
+      els.learnerHand.innerHTML = "";
+      if (!cards.length) {
+        els.learnerHand.innerHTML = '<div class="empty">Learner hand is empty.</div>';
+        return;
+      }
+      for (const card of cards) {
+        const wrap = document.createElement("div");
+        wrap.className = "card-wrap";
+        const probability = probabilities[card.id];
+        const prob = document.createElement("div");
+        prob.className = probability == null ? "prob empty" : "prob";
+        prob.textContent = probability == null ? "0.000" : probability.toFixed(3);
+        wrap.appendChild(prob);
+        wrap.appendChild(cardElement(card, {
+          chosen: isOurs && card.id === record.azione.id,
+          briscola: card.seme === record.seme_briscola,
+        }));
+        els.learnerHand.appendChild(wrap);
+      }
+    }
+
+    function cardElement(card, options = {}) {
+      const div = document.createElement("div");
+      div.className = `card${options.small ? " small" : ""}`;
+      if (options.chosen) div.classList.add("chosen");
+      if (options.briscola) div.classList.add("briscola");
+      if (options.playedNow) div.classList.add("played-now");
+      const color = cardColor(card);
+      const rank = rankShort(card.rango);
+      const suit = suitShort(card.seme);
+      div.innerHTML = `
+        <div class="corner ${color}">
+          <span>${rank}</span>
+          <span>${suit}</span>
+        </div>
+        <div class="art ${color}">
+          ${cardArtwork(card)}
+        </div>
+        <div class="corner bottom ${color}">
+          <span>${rank}</span>
+          <span>${suit}</span>
+        </div>
+      `;
+      div.title = card.id;
+      return div;
+    }
+
+    function cardArtwork(card) {
+      const suit = suitEmoji(card.seme);
+      if (card.rango === "asso") {
+        return `<div class="ace-art">${suit}</div>`;
+      }
+      if (["re", "cavallo", "fante"].includes(card.rango)) {
+        return `<div class="court-art">${rankShort(card.rango)}<br>${suit}</div>`;
+      }
+      return `<div class="pip-grid">${repeatPips(suit, cardValue(card.rango))}</div>`;
+    }
+
+    function ownerLabel(player, ourPlayer) {
+      if (player === ourPlayer) return "OUR TURN";
+      if (player % 2 === ourPlayer % 2) return "partner turn";
+      return "opponent turn";
+    }
+
+    function roleLabel(player, ourPlayer) {
+      if (player === ourPlayer) return "learner";
+      if (player % 2 === ourPlayer % 2) return "partner";
+      return "opponent";
+    }
+
+    function rankShort(rank) {
+      return {
+        asso: "A",
+        tre: "3",
+        re: "R",
+        cavallo: "C",
+        fante: "F",
+        sette: "7",
+        sei: "6",
+        cinque: "5",
+        quattro: "4",
+        due: "2",
+      }[rank] || rank;
+    }
+
+    function suitShort(suit) {
+      return suitEmoji(suit);
+    }
+
+    function suitEmoji(suit) {
+      return {
+        coppe: "🏆",
+        denari: "🪙",
+        bastoni: "🪵",
+        spade: "⚔️",
+      }[suit] || "?";
+    }
+
+    function cardValue(rank) {
+      return {
+        asso: 1,
+        due: 2,
+        tre: 3,
+        quattro: 4,
+        cinque: 5,
+        sei: 6,
+        sette: 7,
+      }[rank] || 1;
+    }
+
+    function repeatPips(suit, count) {
+      return Array.from({ length: count }, () => `<span class="pip">${suit}</span>`).join("");
+    }
+
+    function cardColor(card) {
+      return card.seme === "coppe" || card.seme === "denari" ? "red" : "black";
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+  </script>
+</body>
+</html>
