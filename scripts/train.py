@@ -25,7 +25,14 @@ from evaluation import (
     evaluate_suite,
     make_evaluation_cases,
 )
-from policy import BriscolaFeatureExtractor, LinearSoftmaxPolicy, NeuralSoftmaxPolicy
+from policy import (
+    FEATURE_SET_NAMES,
+    BriscolaFeatureExtractor,
+    LinearSoftmaxPolicy,
+    NeuralSoftmaxPolicy,
+    NewFeatureSetExtractor,
+    build_feature_extractor,
+)
 from training import (
     BASELINE_MODES,
     BootstrapPolicySchedule,
@@ -62,6 +69,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--learner-giocatore-id", type=int, default=0)
+    parser.add_argument(
+        "--feature-set",
+        choices=sorted(FEATURE_SET_NAMES),
+        default="base",
+    )
     parser.add_argument(
         "--policy-type",
         choices=sorted(POLICY_TYPES),
@@ -153,7 +165,7 @@ def main() -> None:
     args = parse_args()
 
     # The extractor fixes the order and number of features used by theta.
-    extractor = BriscolaFeatureExtractor()
+    extractor = build_feature_extractor(args.feature_set)
     learner = initialize_learner(args, extractor)
     # The pool stores frozen learner copies used as opponents/partner.
     pool = SnapshotPool(
@@ -326,7 +338,7 @@ def stats_to_dict(stats: SelfPlayStats) -> dict[str, Any]:
 
 def initialize_learner(
     args: argparse.Namespace,
-    extractor: BriscolaFeatureExtractor,
+    extractor: BriscolaFeatureExtractor | NewFeatureSetExtractor,
 ) -> LinearSoftmaxPolicy | NeuralSoftmaxPolicy:
     """Create the requested learner without changing the default linear path."""
 
@@ -470,7 +482,7 @@ def metrics_to_dict(metrics: EvaluationMetrics) -> dict[str, Any]:
 def checkpoint_to_dict(
     *,
     args: argparse.Namespace,
-    extractor: BriscolaFeatureExtractor,
+    extractor: BriscolaFeatureExtractor | NewFeatureSetExtractor,
     learner: LinearSoftmaxPolicy | NeuralSoftmaxPolicy,
     pool: SnapshotPool,
     trainer: SelfPlayTrainer,
@@ -495,6 +507,7 @@ def checkpoint_to_dict(
             "bootstrap_updates": args.bootstrap_updates,
             "keep_initial_pool": args.keep_initial_pool,
             "learner_giocatore_id": args.learner_giocatore_id,
+            "feature_set": args.feature_set,
             "policy_type": args.policy_type,
             "hidden_size": args.hidden_size,
             "init_scale": args.init_scale,
