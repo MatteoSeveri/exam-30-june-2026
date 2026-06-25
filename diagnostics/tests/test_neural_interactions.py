@@ -9,8 +9,11 @@ from policy import BriscolaFeatureExtractor, NeuralSoftmaxPolicy
 from diagnostics.neural_interactions import (
     NeuralActionSample,
     analyze_neural_action_samples,
+    build_interaction_candidates,
     collect_neural_action_samples,
     default_interaction_pairs,
+    default_interactions,
+    neural_interaction_report_to_dict,
 )
 from evaluation import EvaluationSuite, make_evaluation_cases
 from policy import RandomPolicy
@@ -78,8 +81,8 @@ class TestNeuralInteractions(unittest.TestCase):
         self.assertEqual(len(analysis.feature_attributions), extractor.size())
         self.assertEqual(len(analysis.interaction_attributions), 1)
         self.assertEqual(
-            analysis.interaction_attributions[0].feature_a,
-            "carta_briscola",
+            analysis.interaction_attributions[0].features,
+            ("carta_briscola", "punti_presa"),
         )
 
     def test_feature_pair_non_valida_solleva_value_error(self):
@@ -148,6 +151,112 @@ class TestNeuralInteractions(unittest.TestCase):
         pairs = default_interaction_pairs(("carta_briscola", "punti_presa"))
 
         self.assertEqual(pairs, (("carta_briscola", "punti_presa"),))
+
+    def test_default_interactions_include_coppie_e_triple(self):
+        interactions = default_interactions(
+            (
+                "carta_briscola",
+                "punti_presa",
+                "carta_prende",
+                "posizione_quarto",
+            ),
+            max_order=3,
+        )
+
+        self.assertIn(("carta_briscola", "punti_presa"), interactions)
+        self.assertIn(("carta_briscola", "punti_presa", "carta_prende"), interactions)
+
+    def test_build_interaction_candidates_supporta_ordini_superiori_a_quattro(self):
+        interactions = build_interaction_candidates(
+            features=(
+                "carta_briscola",
+                "punti_presa",
+                "carta_prende",
+                "posizione_quarto",
+                "fase_finale",
+            ),
+            max_order=5,
+        )
+
+        self.assertIn(
+            (
+                "carta_briscola",
+                "punti_presa",
+                "carta_prende",
+                "posizione_quarto",
+                "fase_finale",
+            ),
+            interactions,
+        )
+
+    def test_build_interaction_candidates_rifiuta_ordini_sopra_le_feature(self):
+        with self.assertRaises(ValueError):
+            build_interaction_candidates(
+                features=("carta_briscola", "punti_presa"),
+                max_order=5,
+            )
+
+    def test_build_interaction_candidates_rispetta_limite_candidate(self):
+        with self.assertRaises(ValueError):
+            build_interaction_candidates(
+                features=(
+                    "carta_briscola",
+                    "punti_presa",
+                    "carta_prende",
+                    "posizione_quarto",
+                    "fase_finale",
+                ),
+                max_order=3,
+                max_candidates=10,
+            )
+
+    def test_report_include_top_interactions_per_ordine(self):
+        extractor = BriscolaFeatureExtractor()
+        policy = NeuralSoftmaxPolicy.initialize(
+            extractor,
+            rng=random.Random(3),
+            hidden_size=4,
+        )
+        obs = osservazione_con_mano()
+        samples = [
+            NeuralActionSample(
+                scenario_name="unit",
+                game_index=0,
+                step_index=0,
+                action_id=obs.azioni_legali[0].id,
+                chosen=True,
+                probability=0.5,
+                logit=0.0,
+                features=tuple(extractor.extract(obs, obs.azioni_legali[0])),
+            )
+        ]
+        analysis = analyze_neural_action_samples(
+            policy=policy,
+            samples=samples,
+            interaction_candidates=(
+                ("carta_briscola", "punti_presa"),
+                ("carta_briscola", "punti_presa", "carta_prende"),
+            ),
+        )
+
+        report = neural_interaction_report_to_dict(
+            checkpoint_path="checkpoint.json",
+            checkpoint_update_index=1,
+            games_per_scenario=1,
+            greedy=True,
+            chosen_only=False,
+            samples=samples,
+            analysis=analysis,
+            top_n=5,
+        )
+
+        self.assertEqual(report["interaction_config"]["candidate_count"], 2)
+        self.assertEqual(
+            report["interaction_config"]["candidate_order_counts"],
+            {"2": 1, "3": 1},
+        )
+        self.assertIn("2", report["top_interactions_by_order"])
+        self.assertIn("3", report["top_interactions_by_order"])
 
 
 if __name__ == "__main__":

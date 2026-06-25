@@ -15,9 +15,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from diagnostics import (
+    DEFAULT_MAX_INTERACTION_CANDIDATES,
     analyze_neural_action_samples,
     collect_neural_action_samples,
-    default_interaction_pairs,
+    default_interactions,
     neural_interaction_report_to_dict,
 )
 from evaluation import default_evaluation_suite, make_evaluation_cases
@@ -40,12 +41,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chosen-only", action="store_true")
     parser.add_argument("--max-decisions", type=int, default=0)
     parser.add_argument("--top", type=int, default=20)
+    parser.add_argument("--max-interaction-order", type=int, default=3)
+    parser.add_argument(
+        "--max-interaction-candidates",
+        type=int,
+        default=DEFAULT_MAX_INTERACTION_CANDIDATES,
+        help=(
+            "Maximum default interaction candidates to generate. Increase this "
+            "explicitly for high-order scans."
+        ),
+    )
     parser.add_argument(
         "--pair",
         action="append",
         type=parse_pair,
         default=None,
-        help="Feature pair as feature_a:feature_b. Repeat for custom pairs.",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--interaction",
+        action="append",
+        type=parse_interaction,
+        default=None,
+        help=(
+            "Custom interaction as feature_a:feature_b[:feature_c...]. "
+            "Repeat for multiple custom interactions."
+        ),
     )
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
@@ -55,6 +76,12 @@ def parse_args() -> argparse.Namespace:
         parser.error("--max-decisions deve essere non negativo")
     if args.top <= 0:
         parser.error("--top deve essere positivo")
+    if args.max_interaction_order < 2:
+        parser.error("--max-interaction-order deve essere almeno 2")
+    if args.max_interaction_candidates <= 0:
+        parser.error("--max-interaction-candidates deve essere positivo")
+    if args.pair and args.interaction:
+        parser.error("--pair e --interaction sono alternativi")
     return args
 
 
@@ -80,15 +107,19 @@ def main() -> None:
         chosen_only=args.chosen_only,
         max_decisions=args.max_decisions or None,
     )
-    interaction_pairs = (
-        tuple(args.pair)
-        if args.pair
-        else default_interaction_pairs(learner.feature_extractor.feature_names)
+    interaction_candidates = (
+        tuple(args.interaction or args.pair)
+        if args.interaction or args.pair
+        else default_interactions(
+            learner.feature_extractor.feature_names,
+            max_order=args.max_interaction_order,
+            max_candidates=args.max_interaction_candidates,
+        )
     )
     analysis = analyze_neural_action_samples(
         policy=learner,
         samples=samples,
-        interaction_pairs=interaction_pairs,
+        interaction_candidates=interaction_candidates,
     )
 
     output_path = args.output or default_output_path(args.checkpoint, args.games)
@@ -117,12 +148,25 @@ def main() -> None:
 def parse_pair(value: str) -> tuple[str, str]:
     """Parse one CLI feature pair."""
 
-    parts = value.split(":")
-    if len(parts) != 2 or not parts[0] or not parts[1]:
+    parts = parse_interaction(value)
+    if len(parts) != 2:
         raise argparse.ArgumentTypeError(
             "Feature pairs must use the feature_a:feature_b format"
         )
     return parts[0], parts[1]
+
+
+def parse_interaction(value: str) -> tuple[str, ...]:
+    """Parse one CLI feature interaction."""
+
+    parts = tuple(part for part in value.split(":") if part)
+    if len(parts) < 2:
+        raise argparse.ArgumentTypeError(
+            "Interactions must contain at least 2 features separated by ':'"
+        )
+    if len(set(parts)) != len(parts):
+        raise argparse.ArgumentTypeError("Interaction features must be distinct")
+    return parts
 
 
 def default_output_path(checkpoint_path: Path, games: int) -> Path:
@@ -135,6 +179,8 @@ def print_report_summary(analysis, *, top_n: int) -> None:
     """Print compact interaction and feature tables."""
 
     print(f"samples={analysis.sample_count}")
+    print(f"candidate_interactions={len(analysis.interaction_candidates)}")
+    print_order_counts(analysis)
     print("\nTop feature sensitivities")
     print(f"{'feature':42} {'strength':>12} {'mean_abs_grad':>14} {'std':>9}")
     for attribution in analysis.feature_attributions[:top_n]:
@@ -145,18 +191,63 @@ def print_report_summary(analysis, *, top_n: int) -> None:
             f"{attribution.feature_std:9.4f}"
         )
 
-    print("\nTop pair interactions")
+    print("\nTop interactions")
     print(
-        f"{'feature_a':32} {'feature_b':32} "
-        f"{'strength':>12} {'mean_abs_cross':>15}"
+        f"{'features':74} {'order':>5} "
+        f"{'strength':>12} {'mean_abs_partial':>16}"
     )
     for attribution in analysis.interaction_attributions[:top_n]:
         print(
-            f"{attribution.feature_a:32} "
-            f"{attribution.feature_b:32} "
+            f"{format_interaction(attribution.features):74} "
+            f"{len(attribution.features):5d} "
             f"{attribution.weighted_strength:12.6f} "
-            f"{attribution.mean_abs_cross_partial:15.6f}"
+            f"{attribution.mean_abs_partial:16.6f}"
         )
+    print_top_interactions_by_order(analysis, top_n=top_n)
+
+
+def print_order_counts(analysis) -> None:
+    """Print how many candidate interactions were evaluated per order."""
+
+    counts: dict[int, int] = {}
+    for candidate in analysis.interaction_candidates:
+        counts[len(candidate)] = counts.get(len(candidate), 0) + 1
+    print(
+        "interaction_orders="
+        + ", ".join(f"{order}:{count}" for order, count in sorted(counts.items()))
+    )
+
+
+def print_top_interactions_by_order(analysis, *, top_n: int) -> None:
+    """Print order-specific interaction tables sorted by raw mixed partials."""
+
+    grouped: dict[int, list] = {}
+    for attribution in analysis.interaction_attributions:
+        grouped.setdefault(len(attribution.features), []).append(attribution)
+
+    for order, rows in sorted(grouped.items()):
+        print(f"\nTop interactions of order {order} by mean_abs_partial")
+        print(
+            f"{'features':74} {'order':>5} "
+            f"{'strength':>12} {'mean_abs_partial':>16}"
+        )
+        for attribution in sorted(
+            rows,
+            key=lambda item: item.mean_abs_partial,
+            reverse=True,
+        )[:top_n]:
+            print(
+                f"{format_interaction(attribution.features):74} "
+                f"{len(attribution.features):5d} "
+                f"{attribution.weighted_strength:12.6f} "
+                f"{attribution.mean_abs_partial:16.6f}"
+            )
+
+
+def format_interaction(features: tuple[str, ...]) -> str:
+    """Return a readable interaction label."""
+
+    return " x ".join(features)
 
 
 if __name__ == "__main__":
