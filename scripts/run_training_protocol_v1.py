@@ -23,6 +23,9 @@ STRESS_LEARNING_RATES = ("0.1", "0.3", "0.9")
 CLIPPING_PROBE_NORMS: tuple[str | None, ...] = (None, "1.0", "5.0")
 BOOTSTRAP_UPDATES = (0, 30)
 MATCHUP_SAMPLINGS = ("per_episode", "per_rotation_block")
+POLICY_TYPES = ("linear", "neural")
+DEFAULT_POLICY_TYPES = ("linear",)
+DEFAULT_HIDDEN_SIZES = (64,)
 
 REWARD_PRESETS = {
     "win_heavy": ("1.0", "0.1"),
@@ -35,6 +38,7 @@ REWARD_PRESETS = {
 @dataclass(frozen=True)
 class RunConfig:
     phase: str
+    policy_type: str
     seed: int
     batch_size: int
     updates: int
@@ -50,6 +54,7 @@ class RunConfig:
     max_pool_size: int = 20
     init_scale: str = "0.01"
     max_update_norm: str | None = None
+    hidden_size: int | None = None
 
 
 def value_token(value: str | int) -> str:
@@ -66,10 +71,19 @@ def run_directory(config: RunConfig) -> Path:
         if config.max_update_norm is None
         else f"max_update_norm_{value_token(config.max_update_norm)}"
     )
-    return (
+    directory = (
         PROJECT_ROOT
         / "models"
         / f"learning_rate_{value_token(config.learning_rate)}"
+    )
+    if config.policy_type == "neural":
+        if config.hidden_size is None:
+            raise ValueError("Neural runs require hidden_size")
+        directory = directory / (
+            f"policy_neural_hidden_size_{config.hidden_size}"
+        )
+    return (
+        directory
         / config.reward_mode
         / (
             f"reward_alpha_{value_token(config.reward_alpha)}"
@@ -127,6 +141,12 @@ def train_command(config: RunConfig, python_bin: str) -> list[str]:
         "--log",
         str(directory / "train_log.jsonl"),
     ]
+    if config.policy_type != "linear":
+        command.extend(["--policy-type", config.policy_type])
+    if config.policy_type == "neural":
+        if config.hidden_size is None:
+            raise ValueError("Neural runs require hidden_size")
+        command.extend(["--hidden-size", str(config.hidden_size)])
     if config.max_update_norm is not None:
         command.extend(["--max-update-norm", config.max_update_norm])
     return command
@@ -155,6 +175,8 @@ def cartesian(
     *,
     phase: str,
     seeds: Iterable[int],
+    policy_types: Iterable[str],
+    hidden_sizes: Iterable[int],
     batch_size: int,
     updates: int,
     evaluation_games: int | None,
@@ -169,28 +191,37 @@ def cartesian(
 
     configs: list[RunConfig] = []
     for seed in seeds:
-        for learning_rate in learning_rates:
-            for bootstrap in bootstrap_updates:
-                for matchup in matchup_samplings:
-                    for preset in reward_presets:
-                        alpha, lambda_margin = REWARD_PRESETS[preset]
-                        for max_update_norm in max_update_norms:
-                            configs.append(
-                                RunConfig(
-                                    phase=phase,
-                                    seed=seed,
-                                    batch_size=batch_size,
-                                    updates=updates,
-                                    evaluation_games=evaluation_games,
-                                    learning_rate=learning_rate,
-                                    bootstrap_updates=bootstrap,
-                                    matchup_sampling=matchup,
-                                    reward_mode=reward_mode,
-                                    reward_alpha=alpha,
-                                    reward_lambda_margin=lambda_margin,
-                                    max_update_norm=max_update_norm,
-                                )
-                            )
+        for policy_type in policy_types:
+            selected_hidden_sizes: Iterable[int | None]
+            if policy_type == "neural":
+                selected_hidden_sizes = hidden_sizes
+            else:
+                selected_hidden_sizes = (None,)
+            for hidden_size in selected_hidden_sizes:
+                for learning_rate in learning_rates:
+                    for bootstrap in bootstrap_updates:
+                        for matchup in matchup_samplings:
+                            for preset in reward_presets:
+                                alpha, lambda_margin = REWARD_PRESETS[preset]
+                                for max_update_norm in max_update_norms:
+                                    configs.append(
+                                        RunConfig(
+                                            phase=phase,
+                                            policy_type=policy_type,
+                                            seed=seed,
+                                            batch_size=batch_size,
+                                            updates=updates,
+                                            evaluation_games=evaluation_games,
+                                            learning_rate=learning_rate,
+                                            bootstrap_updates=bootstrap,
+                                            matchup_sampling=matchup,
+                                            reward_mode=reward_mode,
+                                            reward_alpha=alpha,
+                                            reward_lambda_margin=lambda_margin,
+                                            max_update_norm=max_update_norm,
+                                            hidden_size=hidden_size,
+                                        )
+                                    )
     return configs
 
 
@@ -257,15 +288,35 @@ def selected_int_values(
     return default
 
 
+def selected_policy_types(args: argparse.Namespace) -> tuple[str, ...]:
+    """Preserve the linear default while allowing neural runs on the same grid."""
+
+    if args.policy_type:
+        return tuple(args.policy_type)
+    if args.all:
+        return POLICY_TYPES
+    return DEFAULT_POLICY_TYPES
+
+
+def selected_hidden_sizes(args: argparse.Namespace) -> tuple[int, ...]:
+    """Select neural hidden sizes; linear runs ignore this axis."""
+
+    return tuple(args.hidden_size or DEFAULT_HIDDEN_SIZES)
+
+
 def build_configs(args: argparse.Namespace) -> list[RunConfig]:
     """Build run configs for the requested protocol phase."""
 
     seeds = tuple(args.seed or [5000])
+    policy_types = selected_policy_types(args)
+    hidden_sizes = selected_hidden_sizes(args)
 
     if args.phase == "stress_lr":
         return cartesian(
             phase=args.phase,
             seeds=seeds,
+            policy_types=policy_types,
+            hidden_sizes=hidden_sizes,
             batch_size=200,
             updates=50,
             evaluation_games=(
@@ -288,6 +339,8 @@ def build_configs(args: argparse.Namespace) -> list[RunConfig]:
         return cartesian(
             phase=args.phase,
             seeds=seeds,
+            policy_types=policy_types,
+            hidden_sizes=hidden_sizes,
             batch_size=180,
             updates=300,
             evaluation_games=None if args.skip_evaluation else 500,
@@ -306,6 +359,8 @@ def build_configs(args: argparse.Namespace) -> list[RunConfig]:
         return cartesian(
             phase=args.phase,
             seeds=seeds,
+            policy_types=policy_types,
+            hidden_sizes=hidden_sizes,
             batch_size=180,
             updates=300,
             evaluation_games=None if args.skip_evaluation else 500,
@@ -326,6 +381,8 @@ def build_configs(args: argparse.Namespace) -> list[RunConfig]:
         return cartesian(
             phase=args.phase,
             seeds=seeds,
+            policy_types=policy_types,
+            hidden_sizes=hidden_sizes,
             batch_size=180,
             updates=300,
             evaluation_games=None if args.skip_evaluation else 100,
@@ -367,6 +424,8 @@ def build_configs(args: argparse.Namespace) -> list[RunConfig]:
         return cartesian(
             phase=args.phase,
             seeds=seeds,
+            policy_types=policy_types,
+            hidden_sizes=hidden_sizes,
             batch_size=300,
             updates=500,
             evaluation_games=None if args.skip_evaluation else 1000,
@@ -387,6 +446,8 @@ def build_configs(args: argparse.Namespace) -> list[RunConfig]:
         return cartesian(
             phase=args.phase,
             seeds=seeds,
+            policy_types=policy_types,
+            hidden_sizes=hidden_sizes,
             batch_size=300,
             updates=500,
             evaluation_games=None if args.skip_evaluation else 1000,
@@ -406,6 +467,8 @@ def build_configs(args: argparse.Namespace) -> list[RunConfig]:
         return cartesian(
             phase=args.phase,
             seeds=seeds,
+            policy_types=policy_types,
+            hidden_sizes=hidden_sizes,
             batch_size=300,
             updates=500,
             evaluation_games=None if args.skip_evaluation else 1000,
@@ -466,6 +529,18 @@ def main() -> None:
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--python-bin", default=sys.executable)
     parser.add_argument("--seed", action="append", type=int)
+    parser.add_argument(
+        "--policy-type",
+        action="append",
+        choices=POLICY_TYPES,
+        help="Policy family to run. Repeat to compare linear and neural.",
+    )
+    parser.add_argument(
+        "--hidden-size",
+        action="append",
+        type=int,
+        help="Neural hidden size. Ignored by linear runs.",
+    )
     parser.add_argument("--learning-rate", action="append")
     parser.add_argument("--bootstrap-updates", action="append", type=int)
     parser.add_argument(
@@ -490,12 +565,17 @@ def main() -> None:
         help="Used only by stress_lr unless the phase has a fixed protocol value.",
     )
     args = parser.parse_args()
+    if args.hidden_size and any(value <= 0 for value in args.hidden_size):
+        raise SystemExit("--hidden-size must be positive")
 
     configs = build_configs(args)
     print(f"phase={args.phase} runs={len(configs)} execute={args.execute}")
     for index, config in enumerate(configs, start=1):
         directory = run_directory(config)
-        print(f"\n# run {index}/{len(configs)} phase={config.phase}")
+        print(
+            f"\n# run {index}/{len(configs)} "
+            f"phase={config.phase} policy_type={config.policy_type}"
+        )
         print(f"# output_dir={directory}")
         maybe_run(
             command=train_command(config, args.python_bin),
