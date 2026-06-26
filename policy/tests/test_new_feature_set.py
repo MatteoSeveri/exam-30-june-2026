@@ -4,7 +4,12 @@ import unittest
 
 from game.cards import Carta, CartaGiocata
 from game.observation import Osservazione
-from policy.new_feature_set import NewFeatureSetExtractor
+from policy.new_feature_set import (
+    DEFAULT_ATOMIC_FEATURE_NAMES,
+    DEFAULT_FEATURE_NAMES,
+    DEFAULT_INTERACTION_FEATURE_NAMES,
+    NewFeatureSetExtractor,
+)
 
 
 def osservazione(
@@ -71,6 +76,32 @@ class TestNewFeatureSetExtractor(unittest.TestCase):
             extractor.feature_names,
         )
         self.assertTrue(all(isinstance(value, float) for value in values))
+
+    def test_feature_groups_are_explicit_and_cover_default_vector(self):
+        # Atomiche e interazioni devono coprire tutto il vettore senza duplicati.
+        extractor = NewFeatureSetExtractor()
+
+        self.assertEqual(extractor.feature_names, list(DEFAULT_FEATURE_NAMES))
+        self.assertEqual(extractor.atomic_feature_names, DEFAULT_ATOMIC_FEATURE_NAMES)
+        self.assertEqual(
+            extractor.interaction_feature_names,
+            DEFAULT_INTERACTION_FEATURE_NAMES,
+        )
+        self.assertEqual(len(extractor.atomic_feature_names), 20)
+        self.assertEqual(len(extractor.interaction_feature_names), 68)
+        self.assertEqual(
+            len(extractor.feature_names),
+            len(set(extractor.feature_names)),
+        )
+        self.assertEqual(
+            set(extractor.feature_names),
+            set(extractor.atomic_feature_names)
+            | set(extractor.interaction_feature_names),
+        )
+        self.assertFalse(
+            set(extractor.atomic_feature_names)
+            & set(extractor.interaction_feature_names),
+        )
 
     def test_categorie_carta_separano_carico_non_briscola_e_briscole(self):
         # Asso/tre di briscola non devono confondersi con carichi non briscola.
@@ -265,6 +296,25 @@ class TestNewFeatureSetExtractor(unittest.TestCase):
                 "carta_fa_pescare_briscola_esposta_a_squadra_avversaria",
             ),
             0.0,
+        )
+
+    def test_feature_interazione_e_prodotto_delle_componenti(self):
+        # Le interazioni engineered devono restare prodotti numerici espliciti.
+        extractor = NewFeatureSetExtractor()
+        carta = Carta("denari", "due")
+        obs = osservazione(
+            mano=(carta,),
+            carte_sul_campo=(
+                CartaGiocata(giocatore_id=1, carta=Carta("coppe", "asso")),
+            ),
+        )
+
+        values = extractor.extract(obs, carta)
+
+        self.assertAlmostEqual(
+            feature(extractor, values, "carta_briscola_x_carta_prende"),
+            feature(extractor, values, "carta_briscola")
+            * feature(extractor, values, "carta_prende"),
         )
 
 

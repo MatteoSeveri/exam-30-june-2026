@@ -20,7 +20,7 @@ FIGURE = {"re", "cavallo", "fante"}
 CARICHI = {"asso", "tre"}
 
 
-DEFAULT_FEATURE_NAMES: tuple[str, ...] = (
+DEFAULT_ATOMIC_FEATURE_NAMES: tuple[str, ...] = (
     "punti_carta",
     "forza_carta",
     "carta_briscola",
@@ -39,6 +39,11 @@ DEFAULT_FEATURE_NAMES: tuple[str, ...] = (
     "carta_taglietto",
     "carta_briscola_alta",
     "carta_tre_briscola",
+    "carta_fa_pescare_briscola_esposta_a_squadra_avversaria",
+    "carta_fa_pescare_briscola_esposta_alla_squadra_nostra",
+)
+
+DEFAULT_INTERACTION_FEATURE_NAMES: tuple[str, ...] = (
     "posizione_primo_x_carta_liscia",
     "posizione_primo_x_carta_punticino",
     "posizione_primo_x_carta_carico_non_briscola",
@@ -103,12 +108,18 @@ DEFAULT_FEATURE_NAMES: tuple[str, ...] = (
     "differenza_punteggio_x_carta_carico_non_briscola",
     "punti_squadra_nostra_x_punti_presa_corrente_x_carta_prende_x_briscola_x_avversario_sta_prendendo_x_punti_carta",
     "punti_squadra_avversaria_x_punti_presa_corrente_x_carta_prende_x_briscola_x_avversario_sta_prendendo",
-    "carta_fa_pescare_briscola_esposta_a_squadra_avversaria",
-    "carta_fa_pescare_briscola_esposta_alla_squadra_nostra",
     "carta_fa_pescare_briscola_esposta_alla_squadra_nostra_x_punti_briscola_esposta",
     "carta_fa_pescare_briscola_esposta_a_squadra_avversaria_x_punti_briscola_esposta",
     "carta_fa_pescare_briscola_esposta_alla_squadra_nostra_x_forza_briscola_esposta",
     "carta_fa_pescare_briscola_esposta_a_squadra_avversaria_x_forza_briscola_esposta",
+)
+
+# Preserve the historical full-vector order for checkpoint compatibility.
+DEFAULT_FEATURE_NAMES: tuple[str, ...] = (
+    DEFAULT_ATOMIC_FEATURE_NAMES[:-2]
+    + DEFAULT_INTERACTION_FEATURE_NAMES[:-4]
+    + DEFAULT_ATOMIC_FEATURE_NAMES[-2:]
+    + DEFAULT_INTERACTION_FEATURE_NAMES[-4:]
 )
 
 
@@ -126,6 +137,20 @@ class NewFeatureSetExtractor:
         """Return the feature vector size."""
 
         return len(self.feature_names)
+
+    @property
+    def atomic_feature_names(self) -> tuple[str, ...]:
+        """Return the active non-interaction feature names."""
+
+        atomic_names = set(DEFAULT_ATOMIC_FEATURE_NAMES)
+        return tuple(name for name in self.feature_names if name in atomic_names)
+
+    @property
+    def interaction_feature_names(self) -> tuple[str, ...]:
+        """Return the active engineered interaction feature names."""
+
+        interaction_names = set(DEFAULT_INTERACTION_FEATURE_NAMES)
+        return tuple(name for name in self.feature_names if name in interaction_names)
 
     def extract(self, osservazione: Osservazione, carta: Carta) -> list[float]:
         """Extract features from legal information and one legal candidate card."""
